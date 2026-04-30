@@ -42,7 +42,6 @@ class ClientAnalyticsService extends AnalyticsService
 
         $leadRows = $this->leadQuery($allowedPipelineNames, $excludedPipelineNames)
             ->selectRaw($this->companyIdSql('sales_leads').' as company_id, count(*) as lead_count, sum(coalesce(budget_amount, 0)) as lead_budget, max(lead_created_at) as last_lead_at')
-            ->whereBetween('lead_created_at', [$period->from, $period->to])
             ->groupByRaw($this->companyIdSql('sales_leads'))
             ->get()
             ->keyBy('company_id');
@@ -50,27 +49,24 @@ class ClientAnalyticsService extends AnalyticsService
         $dealRows = $this->opportunityQuery($allowedPipelineNames, $excludedPipelineNames)
             ->selectRaw($this->companyIdSql('sales_opportunities')." as company_id,
                 count(*) as deal_count,
-                sum(case when status = 'won' then 1 else 0 end) as won_count,
-                sum(case when status = 'lost' then 1 else 0 end) as lost_count,
-                sum(case when status = 'open' then 1 else 0 end) as open_count,
-                sum(case when status = 'won' then amount else 0 end) as won_revenue,
-                avg(amount) as avg_deal_amount,
-                max(last_activity_at) as last_deal_at")
-            ->whereBetween('opened_at', [$period->from, $period->to])
+                sum(case when sales_opportunities.status = 'won' then 1 else 0 end) as won_count,
+                sum(case when sales_opportunities.status = 'lost' then 1 else 0 end) as lost_count,
+                sum(case when sales_opportunities.status = 'open' then 1 else 0 end) as open_count,
+                sum(case when sales_opportunities.status = 'won' then sales_opportunities.amount else 0 end) as won_revenue,
+                avg(sales_opportunities.amount) as avg_deal_amount,
+                max(sales_opportunities.last_activity_at) as last_deal_at")
             ->groupByRaw($this->companyIdSql('sales_opportunities'))
             ->get()
             ->keyBy('company_id');
 
         $latestDealNameRows = $this->opportunityQuery($allowedPipelineNames, $excludedPipelineNames)
             ->selectRaw($this->companyIdSql('sales_opportunities').", (array_agg(sales_opportunities.name order by coalesce(sales_opportunities.last_activity_at, sales_opportunities.opened_at, sales_opportunities.created_at) desc))[1] as latest_deal_name")
-            ->whereBetween('opened_at', [$period->from, $period->to])
             ->groupByRaw($this->companyIdSql('sales_opportunities'))
             ->get()
             ->keyBy('company_id');
 
         $channelRows = $this->leadQuery($allowedPipelineNames, $excludedPipelineNames)
             ->selectRaw($this->companyIdSql('sales_leads').' as company_id, source_channel')
-            ->whereBetween('lead_created_at', [$period->from, $period->to])
             ->whereNotNull('source_channel')
             ->get()
             ->groupBy('company_id')
@@ -298,7 +294,9 @@ class ClientAnalyticsService extends AnalyticsService
 
     protected function leadQuery(array $allowedPipelineNames, array $excludedPipelineNames)
     {
-        $query = SalesLead::query()->leftJoin('pipelines', 'pipelines.id', '=', 'sales_leads.pipeline_id');
+        $query = SalesLead::query()
+            ->leftJoin('pipelines', 'pipelines.id', '=', 'sales_leads.pipeline_id')
+            ->leftJoin('clients as lead_clients', 'lead_clients.id', '=', 'sales_leads.client_id');
         $this->applyPipelineFilterToLeadQuery($query, $allowedPipelineNames, $excludedPipelineNames);
 
         return $query;
@@ -306,7 +304,9 @@ class ClientAnalyticsService extends AnalyticsService
 
     protected function opportunityQuery(array $allowedPipelineNames, array $excludedPipelineNames)
     {
-        $query = SalesOpportunity::query()->leftJoin('pipelines', 'pipelines.id', '=', 'sales_opportunities.pipeline_id');
+        $query = SalesOpportunity::query()
+            ->leftJoin('pipelines', 'pipelines.id', '=', 'sales_opportunities.pipeline_id')
+            ->leftJoin('clients as opportunity_clients', 'opportunity_clients.id', '=', 'sales_opportunities.client_id');
         $this->applyPipelineFilterToOpportunityQuery($query, $allowedPipelineNames, $excludedPipelineNames);
 
         return $query;
@@ -314,7 +314,14 @@ class ClientAnalyticsService extends AnalyticsService
 
     protected function companyIdSql(string $table): string
     {
-        return "coalesce(nullif({$table}.metadata #>> '{amo_lead,companies,0,id}', '')::bigint, 0)";
+        $clientAlias = $table === 'sales_leads' ? 'lead_clients' : 'opportunity_clients';
+
+        return "coalesce(
+            nullif({$table}.metadata #>> '{amo_lead,companies,0,id}', '')::bigint,
+            nullif({$table}.metadata #>> '{amo_lead,company,id}', '')::bigint,
+            nullif({$clientAlias}.external_id, '')::bigint,
+            0
+        )";
     }
 
     protected function applyPipelineFilterToLeadQuery($query, array $allowedPipelineNames, array $excludedPipelineNames): void

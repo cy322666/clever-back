@@ -8,7 +8,9 @@ use App\Models\EntityProduct;
 use App\Models\Invoice;
 use App\Models\Pipeline;
 use App\Models\SalesLead;
+use App\Models\SalesOpportunity;
 use App\Models\SourceConnection;
+use App\Models\Stage;
 use App\Services\Integrations\Contracts\SourceConnector;
 use App\Services\Integrations\SyncResult;
 use Carbon\Carbon;
@@ -25,6 +27,8 @@ class AmoCrmConnector
 {
     protected array $catalogElementCache = [];
     protected array $catalogListCache = [];
+    protected array $pipelineCache = [];
+    protected array $stageCache = [];
 
     public function supports(string $driver): bool
     {
@@ -82,6 +86,12 @@ class AmoCrmConnector
             foreach ($leads as $lead) {
                 $client = null;
                 $company = data_get($lead, '_embedded.companies.0');
+                $pipeline = $this->pipelineForAmoLead($lead);
+                $stage = $this->stageForAmoLead($lead, $pipeline);
+                $status = $this->statusForStage($stage, data_get($lead, 'status_id'));
+                $createdAt = $this->toDateTime(data_get($lead, 'created_at'));
+                $closedAt = $this->toDateTime(data_get($lead, 'closed_at'));
+                $updatedAt = $this->toDateTime(data_get($lead, 'updated_at'));
 
                 if ($company !== null) {
                     $client = $this->upsertAmoCompanyClient($company, data_get($lead, 'name'));
@@ -97,10 +107,10 @@ class AmoCrmConnector
                         'source_channel' => $this->leadSourceChannel($lead),
                         'status_id' => data_get($lead, 'status_id'),
                         'budget_amount' => data_get($lead, 'price', 0),
-                        'lead_created_at' => $this->toDateTime(data_get($lead, 'created_at'))?->toDateTimeString(),
-                        'lead_closed_at' => $this->toDateTime(data_get($lead, 'closed_at'))?->toDateTimeString(),
-                        'last_activity_at' => $this->toDateTime(data_get($lead, 'updated_at'))?->toDateTimeString(),
-                        'pipeline_id' => data_get($lead, 'pipeline_id'),
+                        'lead_created_at' => $createdAt?->toDateTimeString(),
+                        'lead_closed_at' => $closedAt?->toDateTimeString(),
+                        'last_activity_at' => $updatedAt?->toDateTimeString(),
+                        'pipeline_id' => $pipeline?->id,
                         'metadata' => [
                             'amo_lead' => $lead,
                         ],
@@ -108,6 +118,33 @@ class AmoCrmConnector
                 );
                 $pulled++;
                 $leadModel->wasRecentlyCreated ? $created++ : $updated++;
+
+                $opportunityModel = SalesOpportunity::query()->updateOrCreate(
+                    [
+                        'source_system' => 'amoCRM',
+                        'external_id' => (string) data_get($lead, 'id'),
+                    ],
+                    [
+                        'client_id' => $client?->id,
+                        'pipeline_id' => $pipeline?->id,
+                        'stage_id' => $stage?->id,
+                        'name' => data_get($lead, 'name') ?: 'amoCRM lead '.data_get($lead, 'id'),
+                        'amount' => (float) data_get($lead, 'price', 0),
+                        'probability' => $status === 'won' ? 100 : (float) ($stage?->probability ?? 0),
+                        'status' => $status,
+                        'opened_at' => $createdAt?->toDateTimeString(),
+                        'won_at' => $status === 'won' ? $closedAt?->toDateTimeString() : null,
+                        'lost_at' => $status === 'lost' ? $closedAt?->toDateTimeString() : null,
+                        'closed_at' => in_array($status, ['won', 'lost'], true) ? $closedAt?->toDateTimeString() : null,
+                        'last_activity_at' => $updatedAt?->toDateTimeString(),
+                        'source_channel' => $this->leadSourceChannel($lead),
+                        'metadata' => [
+                            'amo_lead' => $lead,
+                        ],
+                    ]
+                );
+                $pulled++;
+                $opportunityModel->wasRecentlyCreated ? $created++ : $updated++;
 
                 $catalogElement = data_get($lead, '_embedded.catalog_elements.0');
 
@@ -785,6 +822,61 @@ class AmoCrmConnector
 
             return [];
         }, $catalogElements)));
+    }
+
+    protected function pipelineForAmoLead(array $lead): ?Pipeline
+    {
+        $externalId = trim((string) data_get($lead, 'pipeline_id', ''));
+
+        if ($externalId === '') {
+            return null;
+        }
+
+        if (array_key_exists($externalId, $this->pipelineCache)) {
+            return $this->pipelineCache[$externalId];
+        }
+
+        return $this->pipelineCache[$externalId] = Pipeline::query()
+            ->where('external_id', $externalId)
+            ->first();
+    }
+
+    protected function stageForAmoLead(array $lead, ?Pipeline $pipeline): ?Stage
+    {
+        $externalId = trim((string) data_get($lead, 'status_id', ''));
+
+        if ($externalId === '') {
+            return null;
+        }
+
+        $cacheKey = ($pipeline?->id ?? 'none').':'.$externalId;
+
+        if (array_key_exists($cacheKey, $this->stageCache)) {
+            return $this->stageCache[$cacheKey];
+        }
+
+        $query = Stage::query()->where('external_id', $externalId);
+
+        if ($pipeline !== null) {
+            $query->where('pipeline_id', $pipeline->id);
+        }
+
+        return $this->stageCache[$cacheKey] = $query->first();
+    }
+
+    protected function statusForStage(?Stage $stage, mixed $statusId): string
+    {
+        $externalId = (string) $statusId;
+
+        if ($stage?->is_success || $externalId === '142') {
+            return 'won';
+        }
+
+        if ($stage?->is_failure || $externalId === '143') {
+            return 'lost';
+        }
+
+        return 'open';
     }
 
     protected function leadSourceChannel(array $leadData): ?string
