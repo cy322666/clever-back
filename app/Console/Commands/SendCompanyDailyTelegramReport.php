@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\ExpenseTransaction;
 use App\Models\Project;
 use App\Models\RevenueTransaction;
-use App\Models\SalesOpportunity;
 use App\Models\TaskTimeEntry;
 use App\Services\Alerts\ProjectLimitMonitorService;
 use App\Services\Notifications\TelegramNotifier;
@@ -81,6 +80,8 @@ class SendCompanyDailyTelegramReport extends Command
     {
         $finance = $this->financeSummary($period);
         $production = $this->productionSummary($period);
+        $employeeHours = $this->employeeHours($period);
+        $projectHours = $this->projectHours($period);
         $projectLoad = $projectLimitMonitor->projectRows();
         $overLimit = $projectLoad->filter(fn (array $row): bool => (float) $row['utilization_pct'] >= 100);
         $nearLimit = $projectLoad->filter(fn (array $row): bool => (float) $row['utilization_pct'] >= 85 && (float) $row['utilization_pct'] < 100);
@@ -98,6 +99,32 @@ class SendCompanyDailyTelegramReport extends Command
             'Активных проектов: <b>'.number_format($production['active_projects'], 0, ',', ' ').'</b>',
             'За лимитом: <b>'.number_format($overLimit->count(), 0, ',', ' ').'</b>, на грани: <b>'.number_format($nearLimit->count(), 0, ',', ' ').'</b>',
         ];
+
+        if ($employeeHours !== []) {
+            $lines[] = '';
+            $lines[] = '<b>Часы по сотрудникам</b>';
+
+            foreach ($employeeHours as $row) {
+                $lines[] = sprintf(
+                    '%s: <b>%s ч</b>',
+                    e((string) $row['name']),
+                    number_format((float) $row['hours'], 1, ',', ' '),
+                );
+            }
+        }
+
+        if ($projectHours !== []) {
+            $lines[] = '';
+            $lines[] = '<b>Часы по проектам</b>';
+
+            foreach ($projectHours as $row) {
+                $lines[] = sprintf(
+                    '%s: <b>%s ч</b>',
+                    e((string) $row['name']),
+                    number_format((float) $row['hours'], 1, ',', ' '),
+                );
+            }
+        }
 
         $hotProjects = $projectLoad
             ->filter(fn (array $row): bool => (float) $row['utilization_pct'] >= 85)
@@ -152,31 +179,6 @@ class SendCompanyDailyTelegramReport extends Command
     }
 
     /**
-     * @return array{won_count: int, won_amount: float, new_count: int}
-     */
-    protected function salesSummary(AnalyticsPeriod $period): array
-    {
-        $wonQuery = SalesOpportunity::query()
-            ->leftJoin('stages', 'stages.id', '=', 'sales_opportunities.stage_id')
-            ->where(function ($query) {
-                $query->where('sales_opportunities.status', 'won')
-                    ->orWhere('stages.is_success', true)
-                    ->orWhere('stages.external_id', '142');
-            })
-            ->whereBetween(DB::raw('coalesce(sales_opportunities.won_at, sales_opportunities.opened_at, sales_opportunities.created_at)'), [$period->from, $period->to]);
-
-        $newCount = SalesOpportunity::query()
-            ->whereBetween(DB::raw('coalesce(opened_at, created_at)'), [$period->from, $period->to])
-            ->count();
-
-        return [
-            'won_count' => (clone $wonQuery)->count(),
-            'won_amount' => (float) (clone $wonQuery)->sum('sales_opportunities.amount'),
-            'new_count' => (int) $newCount,
-        ];
-    }
-
-    /**
      * @return array{hours: float, active_projects: int}
      */
     protected function productionSummary(AnalyticsPeriod $period): array
@@ -189,6 +191,67 @@ class SendCompanyDailyTelegramReport extends Command
                 ->where('status', 'active')
                 ->count(),
         ];
+    }
+
+    /**
+     * @return array<int, array{name: string, hours: float}>
+     */
+    protected function employeeHours(AnalyticsPeriod $period): array
+    {
+        return TaskTimeEntry::query()
+            ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as name")
+            ->selectRaw('sum(task_time_entries.minutes) / 60.0 as hours')
+            ->leftJoin('employees', function ($join) {
+                $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
+            })
+            ->leftJoinSub($this->employeeMappingsQuery(), 'employee_mappings', function ($join) {
+                $join->whereRaw('employee_mappings.external_id = task_time_entries.employee_id::text');
+            })
+            ->leftJoin('employees as mapped_employees', 'mapped_employees.id', '=', 'employee_mappings.internal_id')
+            ->whereBetween('task_time_entries.entry_date', [$period->from->toDateString(), $period->to->toDateString()])
+            ->groupByRaw("coalesce(employees.id::text, mapped_employees.id::text, task_time_entries.employee_id::text, 'unassigned')")
+            ->orderByDesc('hours')
+            ->get()
+            ->map(fn (object $row): array => [
+                'name' => (string) $row->name,
+                'hours' => round((float) $row->hours, 1),
+            ])
+            ->filter(fn (array $row): bool => (float) $row['hours'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{name: string, hours: float}>
+     */
+    protected function projectHours(AnalyticsPeriod $period): array
+    {
+        return TaskTimeEntry::query()
+            ->selectRaw("coalesce(max(projects.name), 'Без проекта') as name")
+            ->selectRaw('sum(task_time_entries.minutes) / 60.0 as hours')
+            ->leftJoin('tasks', 'tasks.id', '=', 'task_time_entries.task_id')
+            ->leftJoin('projects', 'projects.id', '=', 'tasks.project_id')
+            ->whereBetween('task_time_entries.entry_date', [$period->from->toDateString(), $period->to->toDateString()])
+            ->groupByRaw("coalesce(projects.id, 0)")
+            ->orderByDesc('hours')
+            ->get()
+            ->map(fn (object $row): array => [
+                'name' => (string) $row->name,
+                'hours' => round((float) $row->hours, 1),
+            ])
+            ->filter(fn (array $row): bool => (float) $row['hours'] > 0)
+            ->values()
+            ->all();
+    }
+
+    private function employeeMappingsQuery()
+    {
+        return DB::table('source_mappings')
+            ->selectRaw('external_id, max(label) as label, max(internal_id) as internal_id')
+            ->where('source_key', 'weeek')
+            ->where('external_type', 'user')
+            ->where('internal_type', 'App\Models\Employee')
+            ->groupBy('external_id');
     }
 
     protected function periodLabel(AnalyticsPeriod $period): string
