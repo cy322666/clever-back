@@ -219,12 +219,16 @@ class AmoCrmConnector
             }
         }
 
-        try {
-            $invoiceStats = $this->syncInvoices($amoApi, $connection, $settings);
-        } catch (Throwable $throwable) {
-            report($throwable);
-            $warnings[] = 'Invoices: '.$throwable->getMessage();
-            $invoiceStats = ['pulled' => 0, 'created' => 0, 'updated' => 0];
+        $invoiceStats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'skipped' => true];
+
+        if ((bool) ($settings['sync_invoices'] ?? false)) {
+            try {
+                $invoiceStats = $this->syncInvoices($amoApi, $connection, $settings);
+            } catch (Throwable $throwable) {
+                report($throwable);
+                $warnings[] = 'Invoices: '.$throwable->getMessage();
+                $invoiceStats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'failed' => true];
+            }
         }
 
         return SyncResult::ok(

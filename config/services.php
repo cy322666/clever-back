@@ -15,6 +15,7 @@ return [
         'invoice_vat_field_id' => env('AMO_INVOICE_VAT_FIELD_ID', 169889),
         'invoice_payment_hash_field_id' => env('AMO_INVOICE_PAYMENT_HASH_FIELD_ID', 458745),
         'invoice_items_field_id' => env('AMO_INVOICE_ITEMS_FIELD_ID', 169939),
+        'sync_invoices' => env('AMO_SYNC_INVOICES', false),
     ],
     'weeek' => [
         'base_url' => env('WEEEK_BASE_URL'),
