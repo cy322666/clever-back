@@ -118,8 +118,10 @@ class ProductAnalyticsService extends AnalyticsService
             ? "coalesce(entity_products.entity_date, entity_products.created_at)"
             : 'entity_products.created_at';
 
+        $soldLeadStatusColumn = Schema::hasColumn('sales_leads', 'status_id') ? 'status_id' : 'status';
+
         $soldLeadNames = SalesLead::query()
-            ->where('status_id', 142)
+            ->where($soldLeadStatusColumn, 142)
             ->pluck('name', 'external_id')
             ->all();
 
@@ -129,7 +131,7 @@ class ProductAnalyticsService extends AnalyticsService
             ->all();
 
         $soldLeadIds = SalesLead::query()
-            ->where('status_id', 142)
+            ->where($soldLeadStatusColumn, 142)
             ->pluck('external_id')
             ->map(fn ($value): string => (string) $value)
             ->all();
@@ -219,7 +221,7 @@ class ProductAnalyticsService extends AnalyticsService
 
         $fallbackRows = collect();
 
-        foreach (SalesLead::query()->where('status_id', 142)->select('id', 'external_id', 'name', 'lead_created_at', 'metadata')->get() as $lead) {
+        foreach (SalesLead::query()->where($soldLeadStatusColumn, 142)->select('id', 'external_id', 'name', 'lead_created_at', 'metadata')->get() as $lead) {
             $fallbackRows = $fallbackRows->merge(
                 $this->catalogRowsFromPayload(
                     'deal',
