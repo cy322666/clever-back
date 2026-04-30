@@ -4,7 +4,11 @@ services:
       context: .
       target: app
     image: owner-analytics-app:prod
-    command: sh -lc "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
+    command: >
+      sh -lc "if [ ! -f vendor/autoload.php ] || [ ! -f vendor/symfony/deprecation-contracts/function.php ];
+      then composer install --no-dev --no-interaction --no-scripts --prefer-dist --ignore-platform-req=ext-gd --ignore-platform-req=ext-intl;
+      fi;
+      php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
     ports:
       - "8000:8000"
     env_file:
@@ -17,7 +21,11 @@ services:
 
   scheduler:
     image: owner-analytics-app:prod
-    command: sh -lc "php artisan schedule:work"
+    command: >
+      sh -lc "if [ ! -f vendor/autoload.php ] || [ ! -f vendor/symfony/deprecation-contracts/function.php ];
+      then composer install --no-dev --no-interaction --no-scripts --prefer-dist --ignore-platform-req=ext-gd --ignore-platform-req=ext-intl;
+      fi;
+      php artisan schedule:work"
     env_file:
       - .env
     environment:
