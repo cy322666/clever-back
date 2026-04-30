@@ -49,11 +49,38 @@ function owner_analytics_install_vendor(string $basePath): bool
     return $exitCode === 0 && owner_analytics_vendor_is_valid($basePath.'/vendor');
 }
 
+function owner_analytics_clear_bootstrap_cache(string $basePath): void
+{
+    foreach (glob($basePath.'/bootstrap/cache/*.php') ?: [] as $cacheFile) {
+        @unlink($cacheFile);
+    }
+}
+
+function owner_analytics_clear_incompatible_bootstrap_cache(string $basePath, string $vendorPath): void
+{
+    $collisionProvider = $vendorPath.'/nunomaduro/collision/src/Adapters/Laravel/CollisionServiceProvider.php';
+
+    if (is_file($collisionProvider)) {
+        return;
+    }
+
+    foreach (glob($basePath.'/bootstrap/cache/*.php') ?: [] as $cacheFile) {
+        $contents = @file_get_contents($cacheFile);
+
+        if (is_string($contents) && str_contains($contents, 'NunoMaduro\\\\Collision')) {
+            owner_analytics_clear_bootstrap_cache($basePath);
+
+            return;
+        }
+    }
+}
+
 $basePath = __DIR__;
 $vendorPath = $basePath.'/vendor';
 
 if (! owner_analytics_vendor_is_valid($vendorPath)) {
     fwrite(STDERR, "Vendor is missing or broken, repairing...\n");
+    owner_analytics_clear_bootstrap_cache($basePath);
 
     if (! owner_analytics_restore_vendor('/opt/vendor', $vendorPath)
         && ! owner_analytics_install_vendor($basePath)
@@ -61,7 +88,11 @@ if (! owner_analytics_vendor_is_valid($vendorPath)) {
         fwrite(STDERR, "Unable to repair vendor. Run composer install in {$basePath}.\n");
         exit(1);
     }
+
+    owner_analytics_clear_bootstrap_cache($basePath);
 }
+
+owner_analytics_clear_incompatible_bootstrap_cache($basePath, $vendorPath);
 
 require __DIR__.'/vendor/autoload.php';
 
