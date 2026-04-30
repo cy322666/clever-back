@@ -93,7 +93,6 @@ class SendCompanyDailyTelegramReport extends Command
             '<b>Финансы</b>',
             'Выручка: <b>'.$this->money($finance['revenue']).'</b>',
             'Чистыми: <b>'.$this->money($finance['net_revenue']).'</b>',
-            'Чистый поток: <b>'.$this->money($finance['net_cashflow']).'</b>',
             '',
             '<b>Продажи</b>',
             'Успешные сделки: <b>'.number_format($sales['won_count'], 0, ',', ' ').'</b> на <b>'.$this->money($sales['won_amount']).'</b>',
