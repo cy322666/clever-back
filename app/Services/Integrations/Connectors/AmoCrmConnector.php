@@ -80,13 +80,18 @@ class AmoCrmConnector
             $leads = $leadQuery->fetchAll();
 
             foreach ($leads as $lead) {
+                $client = null;
+
+                if (count($lead->companies) > 0) {
+                    $client = $this->upsertAmoCompanyClient($lead->companies[0], $lead->name);
+                }
 
                 SalesLead::query()->updateOrCreate(
                     [
                         'external_id' => $lead->id,
                     ],
                     [
-                        'client_id' => !empty($lead->companies[0]->id) ? $lead->companies[0]->id : null,
+                        'client_id' => $client?->id,
                         'name' => $lead->name,
                         'source_channel' => $lead->cf('Источник')->getValue(),
                         'status_id' => $lead->status_id,
@@ -100,15 +105,6 @@ class AmoCrmConnector
                         ],
                     ]
                 );
-
-                if (count($lead->companies) > 0)
-
-                    Client::query()->updateOrCreate([
-                            'company_id' => $lead->companies[0]->id,
-                        ], [
-                            'name' => trim((string) data_get($lead->companies[0], 'name', $lead->name)),
-                        ]
-                    );
 
                 if (!empty($lead->catalog_elements[0])) {
 
@@ -128,11 +124,16 @@ class AmoCrmConnector
             ->get(['catalog_elements', 'companies']);
 
         foreach ($customers as $customer) {
+            $client = null;
+
+            if (count($customer->companies) > 0) {
+                $client = $this->upsertAmoCompanyClient($customer->companies[0], $customer->name);
+            }
 
             Buyer::query()->updateOrCreate([
                 'external_id' => $customer->id,
             ], [
-                'client_id' => null,
+                'client_id' => $client?->id,
                 'name' => $customer->name,
                 'status' => $customer->status_id,
                 'periodicity' => $customer->periodicity,
@@ -145,15 +146,6 @@ class AmoCrmConnector
                     'amo_customer' => $customer->toArray(),
                 ],
             ]);
-
-            if (count($customer->companies) > 0) {
-                Client::query()->updateOrCreate([
-                        'company_id' => $customer->companies[0]->id,
-                    ], [
-                        'name' => trim((string) data_get($customer->companies[0], 'name', $customer->name)),
-                    ]
-                );
-            }
 
             if (!empty($customer->catalog_elements[0])) {
 
@@ -168,13 +160,19 @@ class AmoCrmConnector
             }
         }
 
-        $companies = Client::query()->get();
+        $companies = Client::query()
+            ->where('source_type', 'amo_company')
+            ->whereNotNull('external_id')
+            ->get();
 
         foreach ($companies as $companyModel) {
 
-            $company = $amoApi->companies()->find($companyModel->company_id);
+            $company = $amoApi->companies()->find($companyModel->external_id);
 
             $companyModel->name = $company->name;
+            $companyModel->metadata = array_merge($companyModel->metadata ?? [], [
+                'amo_company' => method_exists($company, 'toArray') ? $company->toArray() : [],
+            ]);
             $companyModel->save();
         }
 
@@ -346,6 +344,27 @@ class AmoCrmConnector
     protected function isConfigured(array $settings): bool
     {
         return filled($settings['base_url'] ?? null) && filled($settings['access_token'] ?? null);
+    }
+
+    protected function upsertAmoCompanyClient(object $company, ?string $fallbackName = null): Client
+    {
+        $externalId = (string) data_get($company, 'id', '');
+        $name = trim((string) data_get($company, 'name', $fallbackName ?: 'amoCRM company '.$externalId));
+
+        return Client::query()->updateOrCreate(
+            [
+                'source_type' => 'amo_company',
+                'external_id' => $externalId,
+            ],
+            [
+                'name' => $name !== '' ? $name : 'amoCRM company '.$externalId,
+                'category' => 'company',
+                'status' => 'active',
+                'metadata' => [
+                    'amo_company' => method_exists($company, 'toArray') ? $company->toArray() : [],
+                ],
+            ],
+        );
     }
 
     protected function filledSettings(array $settings): array

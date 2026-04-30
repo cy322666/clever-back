@@ -11,8 +11,13 @@ class Client extends Model
     protected $guarded = [];
 
     protected $fillable = [
-        'company_id',
+        'external_id',
+        'source_type',
         'name',
+        'legal_name',
+        'category',
+        'status',
+        'metadata',
     ];
 
     protected function casts(): array

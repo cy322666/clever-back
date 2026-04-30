@@ -83,13 +83,14 @@ class ClientAnalyticsService extends AnalyticsService
             ->all();
 
         $baseClients = Client::query()
-            ->whereIn('company_id', $dealCompanyIds)
+            ->where('source_type', 'amo_company')
+            ->whereIn('external_id', array_map('strval', $dealCompanyIds))
             ->with('owner')
             ->orderBy('name')
             ->get();
 
         $rows = $baseClients->map(function (Client $client) use ($leadRows, $dealRows, $latestDealNameRows, $channelRows, $period, $defaultAmoBaseUrl) {
-            $companyId = (int) ($client->company_id ?? 0);
+            $companyId = (int) ($client->external_id ?? 0);
             $leadRow = $leadRows->get($companyId);
             $dealRow = $dealRows->get($companyId);
             $latestDealNameRow = $latestDealNameRows->get($companyId);

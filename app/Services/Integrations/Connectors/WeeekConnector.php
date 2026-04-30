@@ -89,7 +89,7 @@ class WeeekConnector
         foreach ($projects as $project) {
             foreach ($this->fetchAllProjectTasks($weeekApi, (int) $project->external_id) as $task) {
 
-                Task::query()
+                $taskModel = Task::query()
                     ->updateOrCreate([
                         'external_id' => $task->id,
                     ], [
@@ -127,7 +127,7 @@ class WeeekConnector
                             ->updateOrCreate([
                                 'external_id' => $taskWorkload->id
                             ], [
-                                'task_id' => $task->id,
+                                'task_id' => $taskModel->id,
                                 'employee_id' => $employeeId,
                                 'entry_date' => $taskWorkload->date,
                                 'minutes' => $taskWorkload->duration,

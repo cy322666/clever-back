@@ -98,7 +98,7 @@ class SupportAnalyticsService extends AnalyticsService
         );
 
         $companyIdSql = "coalesce(
-            clients.company_id,
+            nullif(clients.external_id, '')::bigint,
             nullif(sales_opportunities.metadata #>> '{amo_lead,companies,0,id}', '')::bigint,
             nullif(sales_opportunities.metadata #>> '{amo_lead,company,id}', '')::bigint,
             0
@@ -114,7 +114,7 @@ class SupportAnalyticsService extends AnalyticsService
         $clientRows = (clone $supportBase)
             ->leftJoin('clients', 'clients.id', '=', 'sales_opportunities.client_id')
             ->leftJoin('clients as company_clients', function ($join) use ($companyIdSql) {
-                $join->whereRaw("company_clients.company_id = {$companyIdSql}");
+                $join->whereRaw("nullif(company_clients.external_id, '')::bigint = {$companyIdSql}");
             })
             ->selectRaw("
                 {$companyIdSql} as company_id,
