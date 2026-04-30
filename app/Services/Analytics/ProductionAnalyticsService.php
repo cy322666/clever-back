@@ -61,12 +61,13 @@ class ProductionAnalyticsService extends AnalyticsService
                     'is_active' => true,
                 ];
             });
-        $employeeCostMap = $employees->mapWithKeys(function (object $employee) {
-            return [(string) $employee->id => $this->employeeHourlyCost($employee)];
-        })->all();
 
         $dayAxis = $this->dayAxis($period);
         $timeRows = $this->timeEntryRows($period);
+        $employees = $this->mergeTimeEntryEmployees($employees, $timeRows);
+        $employeeCostMap = $employees->mapWithKeys(function (object $employee) {
+            return [(string) $employee->id => $this->employeeHourlyCost($employee)];
+        })->all();
         $employeeDayMatrix = $this->employeeDayMatrix($employees, $timeRows, $dayAxis, $period, $hourRate, $employeeCostMap);
         $previousDayAxis = $this->dayAxis($previousPeriod);
         $previousTimeRows = $this->timeEntryRows($previousPeriod);
@@ -225,7 +226,11 @@ class ProductionAnalyticsService extends AnalyticsService
         return TaskTimeEntry::query()
             ->selectRaw("
                 task_time_entries.entry_date::date as date,
-                coalesce(employees.weeek_uuid::text, task_time_entries.employee_id::text) as employee_id,
+                coalesce(employees.weeek_uuid::text, mapped_employees.weeek_uuid::text, task_time_entries.employee_id::text) as employee_id,
+                coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), max(task_time_entries.employee_id::text), 'Без сотрудника') as employee_name,
+                coalesce(max(employees.capacity_hours_per_week), max(mapped_employees.capacity_hours_per_week), 40) as capacity_hours_per_week,
+                coalesce(max(employees.salary_amount), max(mapped_employees.salary_amount), 0) as salary_amount,
+                coalesce(max(employees.hourly_cost), max(mapped_employees.hourly_cost), 0) as hourly_cost,
                 coalesce(task_projects_by_id.id, task_projects_by_external.id, 0) as project_id,
                 coalesce(task_projects_by_id.name, task_projects_by_external.name, 'Без проекта') as project_name,
                 sum(task_time_entries.minutes) / 60.0 as hours,
@@ -234,6 +239,10 @@ class ProductionAnalyticsService extends AnalyticsService
             ->leftJoin('employees', function ($join) {
                 $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
             })
+            ->leftJoinSub($this->employeeMappingsQuery(), 'employee_mappings', function ($join) {
+                $join->whereRaw('employee_mappings.external_id = task_time_entries.employee_id::text');
+            })
+            ->leftJoin('employees as mapped_employees', 'mapped_employees.id', '=', 'employee_mappings.internal_id')
             ->leftJoin('tasks', 'tasks.id', '=', 'task_time_entries.task_id')
             ->leftJoin('projects as task_projects_by_id', 'task_projects_by_id.id', '=', 'tasks.project_id')
             ->leftJoin('projects as task_projects_by_external', function ($join) {
@@ -242,11 +251,51 @@ class ProductionAnalyticsService extends AnalyticsService
             ->whereBetween('task_time_entries.entry_date', [$period->from->toDateString(), $period->to->toDateString()])
             ->groupByRaw("
                 task_time_entries.entry_date::date,
-                coalesce(employees.weeek_uuid::text, task_time_entries.employee_id::text),
+                coalesce(employees.weeek_uuid::text, mapped_employees.weeek_uuid::text, task_time_entries.employee_id::text),
                 coalesce(task_projects_by_id.id, task_projects_by_external.id, 0),
                 coalesce(task_projects_by_id.name, task_projects_by_external.name, 'Без проекта')
             ")
             ->get();
+    }
+
+    protected function mergeTimeEntryEmployees(Collection $employees, Collection $timeRows): Collection
+    {
+        $existingIds = $employees
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+
+        $missing = $timeRows
+            ->groupBy('employee_id')
+            ->reject(fn (Collection $rows, string $employeeId): bool => in_array($employeeId, $existingIds, true))
+            ->map(function (Collection $rows, string $employeeId): object {
+                $first = $rows->first();
+
+                return (object) [
+                    'id' => $employeeId,
+                    'name' => (string) ($first->employee_name ?? $employeeId),
+                    'capacity_hours_per_week' => (float) ($first->capacity_hours_per_week ?? 40),
+                    'salary_amount' => (float) ($first->salary_amount ?? 0),
+                    'hourly_cost' => (float) ($first->hourly_cost ?? 0),
+                    'is_active' => true,
+                ];
+            })
+            ->values();
+
+        return $employees
+            ->concat($missing)
+            ->sortBy('name')
+            ->values();
+    }
+
+    protected function employeeMappingsQuery()
+    {
+        return DB::table('source_mappings')
+            ->selectRaw('external_id, max(label) as label, max(internal_id) as internal_id')
+            ->where('source_key', 'weeek')
+            ->where('external_type', 'user')
+            ->where('internal_type', Employee::class)
+            ->groupBy('external_id');
     }
 
     protected function employeeDayMatrix(Collection $employees, Collection $timeRows, array $dayAxis, AnalyticsPeriod $period, float $hourRate, array $employeeCostMap = []): Collection

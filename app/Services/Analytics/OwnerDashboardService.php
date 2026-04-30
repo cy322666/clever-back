@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Models\CashflowEntry;
+use App\Models\Employee;
 use App\Models\ExpenseTransaction;
 use App\Models\Project;
 use App\Models\RevenueTransaction;
@@ -94,10 +95,14 @@ class OwnerDashboardService extends AnalyticsService
 
         $employeeHoursRows = TaskTimeEntry::query()
             ->selectRaw("coalesce(task_time_entries.employee_id::text, 'unassigned') as employee_id")
-            ->selectRaw("coalesce(max(employees.name), 'Без сотрудника') as label, sum(task_time_entries.minutes) / 60.0 as value, count(*) as entries")
+            ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), max(task_time_entries.employee_id::text), 'Без сотрудника') as label, sum(task_time_entries.minutes) / 60.0 as value, count(*) as entries")
             ->leftJoin('employees', function ($join) {
                 $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
             })
+            ->leftJoinSub($this->employeeMappingsQuery(), 'employee_mappings', function ($join) {
+                $join->whereRaw('employee_mappings.external_id = task_time_entries.employee_id::text');
+            })
+            ->leftJoin('employees as mapped_employees', 'mapped_employees.id', '=', 'employee_mappings.internal_id')
             ->whereBetween('task_time_entries.entry_date', [$period->from->toDateString(), $period->to->toDateString()])
             ->groupByRaw("coalesce(task_time_entries.employee_id::text, 'unassigned')")
             ->orderByDesc('value')
@@ -435,5 +440,15 @@ class OwnerDashboardService extends AnalyticsService
         }
 
         return $query;
+    }
+
+    protected function employeeMappingsQuery()
+    {
+        return DB::table('source_mappings')
+            ->selectRaw('external_id, max(label) as label, max(internal_id) as internal_id')
+            ->where('source_key', 'weeek')
+            ->where('external_type', 'user')
+            ->where('internal_type', Employee::class)
+            ->groupBy('external_id');
     }
 }
