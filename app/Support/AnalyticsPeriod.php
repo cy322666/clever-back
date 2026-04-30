@@ -15,7 +15,7 @@ class AnalyticsPeriod
 
     public static function fromRequest(Request $request): self
     {
-        $period = (string) $request->string('period', '30d');
+        $period = (string) $request->string('period', 'month');
         $today = CarbonImmutable::now()->startOfDay();
 
         return match ($period) {
@@ -27,15 +27,11 @@ class AnalyticsPeriod
             'prev-month' => new self($today->subMonthNoOverflow()->startOfMonth(), $today->subMonthNoOverflow()->endOfMonth(), $period),
             'quarter' => new self($today->startOfQuarter(), $today->endOfQuarter(), $period),
             'custom' => new self(
-                CarbonImmutable::parse($request->string('from', $today->subDays(29)->toDateString()))->startOfDay(),
+                CarbonImmutable::parse($request->string('from', $today->startOfMonth()->toDateString()))->startOfDay(),
                 CarbonImmutable::parse($request->string('to', $today->toDateString()))->endOfDay(),
                 'custom'
             ),
-            default => new self(
-                CarbonImmutable::parse($request->string('from', $today->subDays(29)->toDateString()))->startOfDay(),
-                CarbonImmutable::parse($request->string('to', $today->toDateString()))->endOfDay(),
-                '30d'
-            ),
+            default => new self($today->startOfMonth(), $today->endOfMonth(), 'month'),
         };
     }
 
@@ -51,8 +47,8 @@ class AnalyticsPeriod
             'month' => new self($today->startOfMonth(), $today->endOfMonth(), $period),
             'prev-month' => new self($today->subMonthNoOverflow()->startOfMonth(), $today->subMonthNoOverflow()->endOfMonth(), $period),
             'quarter' => new self($today->startOfQuarter(), $today->endOfQuarter(), $period),
-            'custom' => new self($today->subDays(29)->startOfDay(), $today->endOfDay(), 'custom'),
-            default => new self($today->subDays(29)->startOfDay(), $today->endOfDay(), '30d'),
+            'custom' => new self($today->startOfMonth(), $today->endOfDay(), 'custom'),
+            default => new self($today->startOfMonth(), $today->endOfMonth(), 'month'),
         };
     }
 
@@ -70,7 +66,7 @@ class AnalyticsPeriod
 
         $from = isset($payload['from'])
             ? CarbonImmutable::parse((string) $payload['from'])->startOfDay()
-            : $today->subDays(29)->startOfDay();
+            : $today->startOfMonth();
         $to = isset($payload['to'])
             ? CarbonImmutable::parse((string) $payload['to'])->endOfDay()
             : $today->endOfDay();

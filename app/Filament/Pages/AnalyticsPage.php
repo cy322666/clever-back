@@ -4,12 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Support\AnalyticsPeriod;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Select;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
-use Filament\Support\Icons\Heroicon;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Widgets\WidgetConfiguration;
 
 abstract class AnalyticsPage extends Page
@@ -60,50 +56,37 @@ abstract class AnalyticsPage extends Page
         $currentPeriod = AnalyticsPeriod::fromRequest(request());
 
         return [
-            Action::make('period')
-                ->label('Период')
-                ->icon(Heroicon::OutlinedCalendarDays)
-                ->modalHeading('Фильтр периода')
-                ->form([
-                    Select::make('period')
-                        ->label('Период')
-                        ->required()
-                        ->default($currentPeriod->key)
-                        ->options([
-                            'today' => 'Сегодня',
-                            '7d' => '7 дней',
-                            '30d' => '30 дней',
-                            'month' => 'Текущий месяц',
-                            'prev-month' => 'Прошлый месяц',
-                            'quarter' => 'Квартал',
-                            'all' => 'Всё время',
-                            'custom' => 'Свой диапазон',
-                        ]),
-                    DatePicker::make('from')
-                        ->label('С')
-                        ->default($currentPeriod->from->toDateString())
-                        ->visible(fn (Get $get): bool => $get('period') === 'custom')
-                        ->required(fn (Get $get): bool => $get('period') === 'custom'),
-                    DatePicker::make('to')
-                        ->label('По')
-                        ->default($currentPeriod->to->toDateString())
-                        ->visible(fn (Get $get): bool => $get('period') === 'custom')
-                        ->required(fn (Get $get): bool => $get('period') === 'custom'),
-                ])
-                ->action(function (array $data): void {
-                    $query = request()->query();
-                    $query['period'] = $data['period'] ?? '30d';
-
-                    if (($query['period'] ?? null) === 'custom') {
-                        $query['from'] = $data['from'] ?? null;
-                        $query['to'] = $data['to'] ?? null;
-                    } else {
-                        unset($query['from'], $query['to']);
-                    }
-
-                    $this->redirect(static::getUrl($query), navigate: true);
-                }),
+            $this->periodAction('today', 'Сегодня', $currentPeriod->key),
+            $this->periodAction('7d', 'Неделя', $currentPeriod->key),
+            $this->periodAction('month', 'Текущий месяц', $currentPeriod->key),
+            $this->periodAction('prev-month', 'Прошлый месяц', $currentPeriod->key),
         ];
+    }
+
+    protected function periodAction(string $period, string $label, string $currentPeriod): Action
+    {
+        $isActive = $period === $currentPeriod;
+
+        return Action::make('period_'.str_replace('-', '_', $period))
+            ->label($label)
+            ->button()
+            ->outlined(! $isActive)
+            ->color($isActive ? 'primary' : 'gray')
+            ->url($this->periodUrl($period));
+    }
+
+    protected function periodUrl(string $period): string
+    {
+        $query = request()->query();
+        unset($query['from'], $query['to']);
+
+        if ($period === 'month') {
+            unset($query['period']);
+        } else {
+            $query['period'] = $period;
+        }
+
+        return static::getUrl($query);
     }
 
     public function getMaxContentWidth(): Width | string | null
