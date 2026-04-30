@@ -38,4 +38,9 @@ class Buyer extends Model
     {
         return $this->belongsTo(Employee::class, 'owner_employee_id');
     }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
 }
