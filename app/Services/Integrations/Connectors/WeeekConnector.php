@@ -50,6 +50,9 @@ class WeeekConnector
         $weeekApi = $this->buildWeeekClient($settings);
         $memberNames = [];
         $memberEmails = [];
+        $pulled = 0;
+        $created = 0;
+        $updated = 0;
 
         if ($weeekApi !== null) {
             foreach (($weeekApi->workspace->members()->members ?? []) as $member) {
@@ -71,7 +74,7 @@ class WeeekConnector
 
         foreach ($projects as $project) {
 
-            Project::query()->updateOrCreate(
+            $projectModel = Project::query()->updateOrCreate(
                 [
                     'external_id' => $project['id']
                 ],
@@ -80,6 +83,9 @@ class WeeekConnector
                     'metadata' => $project,
                 ]
             );
+
+            $pulled++;
+            $projectModel->wasRecentlyCreated ? $created++ : $updated++;
         }
 
         $projects = Project::query()
@@ -115,6 +121,9 @@ class WeeekConnector
                         ]),
                     ]);
 
+                $pulled++;
+                $taskModel->wasRecentlyCreated ? $created++ : $updated++;
+
                 if (count($task->workloads) > 0) {
 
                     foreach ($task->workloads as $taskWorkload) {
@@ -123,7 +132,7 @@ class WeeekConnector
                         $memberEmail = $memberEmails[$externalUserId] ?? null;
                         $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName, $memberEmail);
 
-                        TaskTimeEntry::query()
+                        $timeEntry = TaskTimeEntry::query()
                             ->updateOrCreate([
                                 'external_id' => $taskWorkload->id
                             ], [
@@ -138,12 +147,17 @@ class WeeekConnector
                                     ],
                                 ],
                             ]);
+
+                        $pulled++;
+                        $timeEntry->wasRecentlyCreated ? $created++ : $updated++;
                     }
                 }
             }
         }
 
         app(ProjectLimitMonitorService::class)->refresh();
+
+        return SyncResult::ok($pulled, $created, $updated, message: 'Weeek synchronized');
     }
 
     /**
