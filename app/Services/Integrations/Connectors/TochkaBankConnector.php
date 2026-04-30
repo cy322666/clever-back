@@ -30,16 +30,21 @@ class TochkaBankConnector implements SourceConnector
         $settings = $this->resolveSettings($connection);
 
         if (! $this->isConfigured($settings)) {
-            return SyncResult::fail('Точка Банк не настроен: нужны TOCHKA_TOKEN и TOCHKA_BANK_ACCOUNT');
+            return SyncResult::fail('Точка Банк не настроен: нужен TOCHKA_TOKEN');
         }
 
-        $from = CarbonImmutable::now()
-            ->subDays((int) ($settings['sync_window_days'] ?? config('integrations.default_sync_window_days', 30)))
-            ->startOfDay();
+        $from = CarbonImmutable::now()->startOfYear()->startOfDay();
         $to = CarbonImmutable::now()->endOfDay();
 
         try {
-            $statement = $this->fetchStatement($settings, $from, $to);
+            $account = $this->fetchPrimaryAccount($settings);
+            $accountId = $this->accountId($account);
+
+            if ($accountId === '') {
+                return SyncResult::fail('Точка Банк не вернула accountId в списке счетов');
+            }
+
+            $statement = $this->fetchStatement($settings, $from, $to, $accountId);
         } catch (Throwable $throwable) {
             report($throwable);
 
@@ -67,10 +72,12 @@ class TochkaBankConnector implements SourceConnector
             'processed_count' => 0,
             'imported_at' => now(),
             'metadata' => [
-                'bank_account' => $settings['bank_account'],
+                'bank_account' => $accountId,
+                'account' => $account,
                 'statement_id' => $statement['statementId'] ?? null,
                 'period_from' => $from->toDateString(),
                 'period_to' => $to->toDateString(),
+                'only_direction' => 'credit',
             ],
         ]);
 
@@ -112,6 +119,7 @@ class TochkaBankConnector implements SourceConnector
             updated: $updated,
             payload: [
                 'source' => 'tochka',
+                'bank_account' => $accountId,
                 'statement_id' => $statement['statementId'] ?? null,
                 'period_from' => $from->toDateString(),
                 'period_to' => $to->toDateString(),
@@ -120,15 +128,14 @@ class TochkaBankConnector implements SourceConnector
         );
     }
 
-    protected function fetchStatement(array $settings, CarbonImmutable $from, CarbonImmutable $to): array
+    protected function fetchStatement(array $settings, CarbonImmutable $from, CarbonImmutable $to, string $accountId): array
     {
-        $bankAccount = (string) $settings['bank_account'];
         $baseUrl = rtrim((string) $settings['base_url'], '/');
 
         $initResponse = $this->http($settings)->post($baseUrl.'/open-banking/v1.0/statements', [
             'Data' => [
                 'Statement' => [
-                    'accountId' => $bankAccount,
+                    'accountId' => $accountId,
                     'startDateTime' => $from->toDateString(),
                     'endDateTime' => $to->toDateString(),
                 ],
@@ -152,7 +159,7 @@ class TochkaBankConnector implements SourceConnector
             }
 
             $response = $this->http($settings)->get(
-                $baseUrl.'/open-banking/v1.0/accounts/'.rawurlencode($bankAccount).'/statements/'.rawurlencode($statementId),
+                $baseUrl.'/open-banking/v1.0/accounts/'.rawurlencode($accountId).'/statements/'.rawurlencode($statementId),
             );
             $response->throw();
 
@@ -166,6 +173,26 @@ class TochkaBankConnector implements SourceConnector
         }
 
         return $initStatement;
+    }
+
+    protected function fetchPrimaryAccount(array $settings): array
+    {
+        $baseUrl = rtrim((string) $settings['base_url'], '/');
+        $response = $this->http($settings)->get($baseUrl.'/open-banking/v1.0/accounts');
+        $response->throw();
+
+        $accounts = $this->extractAccounts($response->json() ?? []);
+        $preferredAccountId = trim((string) ($settings['bank_account'] ?? ''));
+
+        if ($preferredAccountId !== '') {
+            foreach ($accounts as $account) {
+                if ($this->accountId($account) === $preferredAccountId) {
+                    return $account;
+                }
+            }
+        }
+
+        return $accounts[0] ?? [];
     }
 
     protected function syncFinanceRows(BankStatementRow $statementRow, array $normalized, array $transaction): void
@@ -251,7 +278,50 @@ class TochkaBankConnector implements SourceConnector
     {
         $transactions = $statement['Transaction'] ?? [];
 
-        return Arr::isAssoc($transactions) ? [$transactions] : array_values($transactions);
+        $transactions = Arr::isAssoc($transactions) ? [$transactions] : array_values($transactions);
+
+        return array_values(array_filter($transactions, function (array $transaction): bool {
+            return Str::lower((string) ($transaction['creditDebitIndicator'] ?? 'Credit')) === 'credit';
+        }));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function extractAccounts(array $payload): array
+    {
+        $accounts = data_get($payload, 'Data.Account')
+            ?? data_get($payload, 'Data.Accounts')
+            ?? data_get($payload, 'accounts')
+            ?? data_get($payload, 'Accounts')
+            ?? data_get($payload, 'Account')
+            ?? [];
+
+        if ($accounts instanceof \Illuminate\Support\Collection) {
+            $accounts = $accounts->all();
+        }
+
+        if (! is_array($accounts)) {
+            return [];
+        }
+
+        if (Arr::isAssoc($accounts)) {
+            return [$accounts];
+        }
+
+        return array_values(array_filter($accounts, fn ($account): bool => is_array($account)));
+    }
+
+    protected function accountId(array $account): string
+    {
+        return trim((string) (
+            data_get($account, 'accountId')
+            ?? data_get($account, 'AccountId')
+            ?? data_get($account, 'account_id')
+            ?? data_get($account, 'id')
+            ?? data_get($account, 'account')
+            ?? ''
+        ));
     }
 
     /**
@@ -320,7 +390,7 @@ class TochkaBankConnector implements SourceConnector
         $message = $throwable->getMessage();
 
         if (str_contains($message, 'status code 403')) {
-            return 'Точка Банк вернула 403: токен виден, но нет доступа к выпискам по этому счету. Проверь права Open Banking/ReadStatements и TOCHKA_BANK_ACCOUNT.';
+            return 'Точка Банк вернула 403: токен виден, но нет доступа к счетам/выпискам. Проверь права Open Banking: ReadAccountsBasic, ReadAccountsDetail и ReadStatements.';
         }
 
         if (str_contains($message, 'cURL error')) {
@@ -353,8 +423,7 @@ class TochkaBankConnector implements SourceConnector
     protected function isConfigured(array $settings): bool
     {
         return filled($settings['base_url'] ?? null)
-            && filled($settings['token'] ?? null)
-            && filled($settings['bank_account'] ?? null);
+            && filled($settings['token'] ?? null);
     }
 
     protected function filledSettings(array $settings): array
