@@ -38,7 +38,7 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
 
         return DB::table('task_time_entries')
             ->selectRaw("coalesce(task_time_entries.employee_id::text, 'unassigned') as employee_key")
-            ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), max(task_time_entries.employee_id::text), 'Без сотрудника') as name")
+            ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as name")
             ->selectRaw('coalesce(max(employees.salary_amount), max(mapped_employees.salary_amount), 0) as salary_amount')
             ->selectRaw('coalesce(sum(task_time_entries.minutes), 0) / 60.0 as hours_total')
             ->selectRaw('coalesce(count(task_time_entries.id), 0) as entries_total')
