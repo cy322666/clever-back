@@ -88,7 +88,6 @@ class SendCompanyDailyTelegramReport extends Command
 
         $lines = [
             '<b>Ежедневная сводка</b>',
-            '<b>Период:</b> '.$this->periodLabel($period),
             '',
             '<b>Финансы</b>',
             'Выручка: <b>'.$this->money($finance['revenue']).'</b>',
