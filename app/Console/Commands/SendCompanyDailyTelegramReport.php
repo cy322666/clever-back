@@ -86,7 +86,7 @@ class SendCompanyDailyTelegramReport extends Command
         $nearLimit = $projectLoad->filter(fn (array $row): bool => (float) $row['utilization_pct'] >= 85 && (float) $row['utilization_pct'] < 100);
 
         $lines = [
-            '<b>Сводка по компании</b>',
+            '<b>Ежедневная сводка</b>',
             '<b>Период:</b> '.$this->periodLabel($period),
             '',
             '<b>Финансы</b>',
