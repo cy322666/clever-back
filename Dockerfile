@@ -1,13 +1,13 @@
 FROM composer:2.8 AS vendor
 WORKDIR /app
-COPY composer.json ./
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-scripts --prefer-dist --ignore-platform-req=ext-gd --ignore-platform-req=ext-intl
 
 FROM node:20-alpine AS assets
 WORKDIR /app
-COPY package.json vite.config.js tailwind.config.js postcss.config.js ./
+COPY package.json package-lock.json vite.config.js tailwind.config.js postcss.config.js ./
 COPY resources ./resources
-RUN npm install
+RUN npm ci
 RUN npm run build
 
 FROM php:8.4-cli-bookworm AS app
@@ -30,10 +30,12 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 COPY . .
+COPY --from=vendor /app/vendor /var/www/html/vendor
 COPY --from=vendor /app/vendor /opt/vendor
 COPY --from=assets /app/public/build /opt/build
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+RUN rm -f bootstrap/cache/*.php
 RUN chmod +x artisan
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

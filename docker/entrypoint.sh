@@ -1,7 +1,8 @@
 #!/bin/sh
 set -e
 
-if [ ! -f /var/www/html/vendor/autoload.php ] && [ -d /opt/vendor ]; then
+if [ -d /opt/vendor ] && { [ "$APP_ENV" = "production" ] || [ ! -f /var/www/html/vendor/autoload.php ]; }; then
+    rm -rf /var/www/html/vendor
     mkdir -p /var/www/html/vendor
     cp -R /opt/vendor/. /var/www/html/vendor/
 fi
