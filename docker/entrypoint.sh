@@ -37,4 +37,8 @@ if [ -n "$DB_HOST" ]; then
     done
 fi
 
+if [ "$APP_ENV" = "production" ]; then
+    php artisan filament:assets --silent || true
+fi
+
 exec "$@"
