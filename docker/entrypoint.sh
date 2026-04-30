@@ -7,18 +7,47 @@ restore_vendor() {
     cp -R /opt/vendor/. /var/www/html/vendor/
 }
 
-if [ -d /opt/vendor ] && {
+vendor_is_valid() {
+    [ -f "$1/autoload.php" ] &&
+    [ -f "$1/symfony/deprecation-contracts/function.php" ] &&
+    php -r "require '$1/autoload.php';" >/dev/null 2>&1
+}
+
+install_vendor() {
+    composer install \
+        --no-dev \
+        --no-interaction \
+        --no-scripts \
+        --prefer-dist \
+        --ignore-platform-req=ext-gd \
+        --ignore-platform-req=ext-intl
+}
+
+if [ -d /opt/vendor ] && vendor_is_valid /opt/vendor && {
     [ "$APP_ENV" = "production" ] ||
     [ ! -f /var/www/html/vendor/autoload.php ] ||
     [ ! -f /var/www/html/vendor/symfony/deprecation-contracts/function.php ] ||
-    ! php -r "require '/var/www/html/vendor/autoload.php';" >/dev/null 2>&1
+    ! vendor_is_valid /var/www/html/vendor
 }; then
     restore_vendor
 fi
 
-if [ -d /opt/vendor ] && ! php -r "require '/var/www/html/vendor/autoload.php';" >/dev/null 2>&1; then
+if [ -d /opt/vendor ] && vendor_is_valid /opt/vendor && ! vendor_is_valid /var/www/html/vendor; then
     restore_vendor
-    php -r "require '/var/www/html/vendor/autoload.php';"
+fi
+
+if ! vendor_is_valid /var/www/html/vendor; then
+    echo "Vendor is missing or broken, running composer install..."
+    rm -rf /var/www/html/vendor
+    install_vendor
+fi
+
+vendor_is_valid /var/www/html/vendor
+
+if [ -d /opt/vendor ] && ! vendor_is_valid /opt/vendor; then
+    rm -rf /opt/vendor
+    mkdir -p /opt/vendor
+    cp -R /var/www/html/vendor/. /opt/vendor/
 fi
 
 if [ -d /opt/build ] && { [ "$APP_ENV" = "production" ] || [ ! -f /var/www/html/public/build/manifest.json ]; }; then
