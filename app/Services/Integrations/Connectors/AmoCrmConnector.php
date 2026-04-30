@@ -107,13 +107,11 @@ class AmoCrmConnector
                 $catalogElement = data_get($lead, '_embedded.catalog_elements.0');
 
                 if (is_array($catalogElement)) {
-                    EntityProduct::query()->updateOrCreate([
-                        'external_id' => data_get($catalogElement, 'id'),
-                        'entity_external_id' => data_get($lead, 'id'),
-                        'entity_type' => 'lead',
-                    ], [
-                        'quantity' => data_get($catalogElement, 'metadata.quantity', 1),
-                        ]
+                    $this->upsertLinkedProduct(
+                        $connection,
+                        'lead',
+                        $lead,
+                        $catalogElement,
                     );
                 }
             }
@@ -161,13 +159,11 @@ class AmoCrmConnector
             $catalogElement = data_get($customer, '_embedded.catalog_elements.0');
 
             if (is_array($catalogElement)) {
-                EntityProduct::query()->updateOrCreate([
-                    'external_id' => data_get($catalogElement, 'id'),
-                    'entity_external_id' => data_get($customer, 'id'),
-                    'entity_type' => 'customer',
-                ], [
-                    'quantity' => data_get($catalogElement, 'metadata.quantity', 1),
-                    ]
+                $this->upsertLinkedProduct(
+                    $connection,
+                    'customer',
+                    $customer,
+                    $catalogElement,
                 );
             }
         }
@@ -475,6 +471,43 @@ class AmoCrmConnector
     protected function filledSettings(array $settings): array
     {
         return array_filter($settings, fn ($value): bool => filled($value));
+    }
+
+    protected function upsertLinkedProduct(
+        SourceConnection $connection,
+        string $entityType,
+        array $entity,
+        array $catalogElement,
+    ): EntityProduct {
+        $productExternalId = (string) data_get($catalogElement, 'id', data_get($catalogElement, 'to_entity_id', ''));
+        $entityExternalId = (string) data_get($entity, 'id', '');
+        $entityName = trim((string) data_get($entity, 'name', $entityType.' #'.$entityExternalId));
+        $quantity = (float) data_get($catalogElement, 'metadata.quantity', data_get($catalogElement, 'quantity', 1));
+        $entityDate = $this->toDateTime(data_get($entity, 'closed_at', data_get($entity, 'created_at')));
+
+        return EntityProduct::query()->updateOrCreate(
+            [
+                'source_key' => $connection->source_key,
+                'external_id' => $productExternalId,
+                'entity_external_id' => $entityExternalId,
+                'entity_type' => $entityType,
+            ],
+            [
+                'source_connection_id' => $connection->id,
+                'source_type' => $connection->driver,
+                'entity_name' => $entityName !== '' ? $entityName : $entityType.' #'.$entityExternalId,
+                'entity_date' => $entityDate?->toDateTimeString(),
+                'product_external_id' => $productExternalId !== '' ? $productExternalId : null,
+                'product_name' => trim((string) data_get($catalogElement, 'name', 'Товар #'.$productExternalId)),
+                'quantity' => $quantity,
+                'unit_price' => (float) data_get($catalogElement, 'price', data_get($catalogElement, 'unit_price', 0)),
+                'total_amount' => (float) data_get($catalogElement, 'total', data_get($catalogElement, 'total_price', 0)),
+                'metadata' => [
+                    'amo_entity' => $entity,
+                    'amo_catalog_element' => $catalogElement,
+                ],
+            ],
+        );
     }
 
     /**
