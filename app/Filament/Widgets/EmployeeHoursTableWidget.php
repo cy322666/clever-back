@@ -37,7 +37,7 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
         $availableHours = 40 * ($periodDays / 7);
 
         return DB::table('task_time_entries')
-            ->selectRaw("coalesce(task_time_entries.employee_id::text, 'unassigned') as employee_key")
+            ->selectRaw("coalesce(employees.id::text, mapped_employees.id::text, task_time_entries.employee_id::text, 'unassigned') as employee_key")
             ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as name")
             ->selectRaw('coalesce(max(employees.salary_amount), max(mapped_employees.salary_amount), 0) as salary_amount')
             ->selectRaw('coalesce(sum(task_time_entries.minutes), 0) / 60.0 as hours_total')
@@ -55,7 +55,7 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
             })
             ->leftJoin('employees as mapped_employees', 'mapped_employees.id', '=', 'employee_mappings.internal_id')
             ->whereBetween('task_time_entries.entry_date', [$period->from->toDateString(), $period->to->toDateString()])
-            ->groupByRaw("coalesce(task_time_entries.employee_id::text, 'unassigned')")
+            ->groupByRaw("coalesce(employees.id::text, mapped_employees.id::text, task_time_entries.employee_id::text, 'unassigned')")
             ->orderByDesc('hours_total')
             ->get()
             ->map(function ($row) use ($availableHours): array {

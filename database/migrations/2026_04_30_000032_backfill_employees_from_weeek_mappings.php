@@ -37,6 +37,8 @@ return new class extends Migration {
                 and source_mappings.internal_id = employees.id
                 and source_mappings.label is not null
                 and trim(source_mappings.label) <> ''
+                and lower(trim(source_mappings.label)) not like 'weeek user%'
+                and source_mappings.label !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                 and (
                     employees.name is null
                     or trim(employees.name) = ''

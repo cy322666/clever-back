@@ -8,6 +8,7 @@ use App\Models\SourceMapping;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -40,13 +41,8 @@ class RepairWeeekEmployees extends Command
         $fixed = 0;
 
         foreach ($members as $member) {
-            $externalId = trim((string) data_get($member, 'id', ''));
-            $name = trim((string) (
-                data_get($member, 'name')
-                ?? data_get($member, 'fullName')
-                ?? data_get($member, 'full_name')
-                ?? ''
-            ));
+            $externalId = trim((string) (data_get($member, 'id') ?? data_get($member, 'userId') ?? data_get($member, 'user_id') ?? ''));
+            $name = $this->memberName($member);
             $email = trim((string) data_get($member, 'email', ''));
 
             if ($externalId === '' || $name === '') {
@@ -60,7 +56,7 @@ class RepairWeeekEmployees extends Command
                 ->first();
 
             if (! $employee) {
-                $employee = Employee::query()->create([
+                $employee = Employee::query()->create($this->employeeAttributes([
                     'name' => $name,
                     'email' => $email !== '' ? $email : 'weeek-'.$externalId.'@example.com',
                     'weeek_uuid' => $externalId,
@@ -69,7 +65,7 @@ class RepairWeeekEmployees extends Command
                     'capacity_hours_per_week' => 40,
                     'weekly_limit_hours' => 40,
                     'metadata' => ['weeek_user' => $member],
-                ]);
+                ]));
             }
 
             $employee->weeek_uuid = $externalId;
@@ -192,6 +188,8 @@ class RepairWeeekEmployees extends Command
                 and source_mappings.internal_id = employees.id
                 and source_mappings.label is not null
                 and trim(source_mappings.label) <> ''
+                and lower(trim(source_mappings.label)) not like 'weeek user%'
+                and source_mappings.label !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                 and (
                     employees.name is null
                     or trim(employees.name) = ''
@@ -208,5 +206,53 @@ class RepairWeeekEmployees extends Command
         return $name === ''
             || Str::of($name)->lower()->startsWith('weeek user')
             || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $name) === 1;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    protected function employeeAttributes(array $attributes): array
+    {
+        return array_filter(
+            $attributes,
+            fn (mixed $value, string $column): bool => Schema::hasColumn('employees', $column),
+            ARRAY_FILTER_USE_BOTH,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $member
+     */
+    protected function memberName(array $member): string
+    {
+        $candidates = [
+            data_get($member, 'name'),
+            data_get($member, 'fullName'),
+            data_get($member, 'full_name'),
+            data_get($member, 'displayName'),
+            data_get($member, 'display_name'),
+            trim(implode(' ', array_filter([
+                data_get($member, 'firstName'),
+                data_get($member, 'middleName'),
+                data_get($member, 'lastName'),
+            ], fn ($part): bool => filled($part)))),
+            trim(implode(' ', array_filter([
+                data_get($member, 'first_name'),
+                data_get($member, 'middle_name'),
+                data_get($member, 'last_name'),
+            ], fn ($part): bool => filled($part)))),
+            data_get($member, 'email'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $name = trim((string) $candidate);
+
+            if ($name !== '' && ! $this->shouldReplaceName($name)) {
+                return $name;
+            }
+        }
+
+        return '';
     }
 }

@@ -94,7 +94,7 @@ class OwnerDashboardService extends AnalyticsService
         $previousSupportActiveAmount = (float) (clone $previousSupportActiveQuery)->sum('sales_opportunities.amount');
 
         $employeeHoursRows = TaskTimeEntry::query()
-            ->selectRaw("coalesce(task_time_entries.employee_id::text, 'unassigned') as employee_id")
+            ->selectRaw("coalesce(employees.id::text, mapped_employees.id::text, task_time_entries.employee_id::text, 'unassigned') as employee_id")
             ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as label, sum(task_time_entries.minutes) / 60.0 as value, count(*) as entries")
             ->leftJoin('employees', function ($join) {
                 $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
@@ -104,7 +104,7 @@ class OwnerDashboardService extends AnalyticsService
             })
             ->leftJoin('employees as mapped_employees', 'mapped_employees.id', '=', 'employee_mappings.internal_id')
             ->whereBetween('task_time_entries.entry_date', [$period->from->toDateString(), $period->to->toDateString()])
-            ->groupByRaw("coalesce(task_time_entries.employee_id::text, 'unassigned')")
+            ->groupByRaw("coalesce(employees.id::text, mapped_employees.id::text, task_time_entries.employee_id::text, 'unassigned')")
             ->orderByDesc('value')
             ->get();
 

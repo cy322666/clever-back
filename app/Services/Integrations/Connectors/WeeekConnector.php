@@ -14,6 +14,7 @@ use App\Services\Integrations\Contracts\SourceConnector;
 use App\Services\Integrations\SyncResult;
 use Carbon\CarbonImmutable;
 use GuzzleHttp\Client as GuzzleClient;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Psr\Http\Client\ClientExceptionInterface;
 use Throwable;
@@ -79,7 +80,7 @@ class WeeekConnector
             try {
                 foreach (($weeekApi->workspace->members()->members ?? []) as $member) {
                     $memberId = (string) data_get($member, 'id', '');
-                    $memberName = trim((string) data_get($member, 'name', data_get($member, 'fullName', data_get($member, 'full_name', ''))));
+                    $memberName = $this->memberDisplayName($member);
                     $memberEmail = trim((string) data_get($member, 'email', ''));
 
                     if ($memberId !== '' && $memberName !== '') {
@@ -333,7 +334,7 @@ class WeeekConnector
             ->first();
 
         if ($employee) {
-            if (filled($displayName) && ! filled($employee->name)) {
+            if (filled($displayName) && $this->shouldReplaceEmployeeName((string) $employee->name)) {
                 $employee->name = $displayName;
                 $employee->save();
             }
@@ -408,7 +409,7 @@ class WeeekConnector
                         $employee->weeek_uuid = $externalUserId;
                     }
 
-                    if (filled($displayName) && Str::of((string) $employee->name)->lower()->contains('weeek user')) {
+                    if (filled($displayName) && $this->shouldReplaceEmployeeName((string) $employee->name)) {
                         $employee->name = $displayName;
                         $employee->save();
                         $mapping->label = $displayName;
@@ -444,7 +445,7 @@ class WeeekConnector
                         [
                             'email' => filled($memberEmail) ? $memberEmail : 'weeek-'.$externalUserId.'@example.com',
                         ],
-                        [
+                        $this->employeeAttributes([
                             'name' => $displayName ?? $existingEmployee?->name ?? 'Weeek user '.$externalUserId,
                             'weeek_uuid' => $externalUserId,
                             'role_title' => 'Production',
@@ -454,7 +455,7 @@ class WeeekConnector
                             'metadata' => [
                                 'weeek_user_id' => $externalUserId,
                             ],
-                        ]
+                        ])
                     );
 
                     if (! filled($employee->weeek_uuid)) {
@@ -509,7 +510,7 @@ class WeeekConnector
             [
                 'email' => 'weeek-'.$externalUserId.'@example.com',
             ],
-            [
+            $this->employeeAttributes([
                 'name' => $name,
                 'weeek_uuid' => $externalUserId,
                 'role_title' => 'Production',
@@ -519,7 +520,7 @@ class WeeekConnector
                 'metadata' => [
                     'weeek_user_id' => $externalUserId,
                 ],
-            ]
+            ])
         );
 
         if (! filled($employee->weeek_uuid)) {
@@ -550,6 +551,12 @@ class WeeekConnector
     {
         $candidates = [
             $memberNames[$externalUserId] ?? null,
+            $this->memberDisplayName(data_get($entry, 'user')),
+            $this->memberDisplayName(data_get($entry, 'assignee')),
+            $this->memberDisplayName(data_get($entry, 'member')),
+            $this->memberDisplayName(data_get($taskPayload, 'assignee')),
+            $this->memberDisplayName(data_get($taskPayload, 'assignees.0')),
+            $this->memberDisplayName(data_get($taskPayload, 'members.0')),
             data_get($entry, 'userName'),
             data_get($entry, 'user.name'),
             data_get($entry, 'user.fullName'),
@@ -579,6 +586,64 @@ class WeeekConnector
         }
 
         return filled($externalUserId) ? null : null;
+    }
+
+    protected function memberDisplayName(mixed $member): ?string
+    {
+        if (! is_array($member) && ! is_object($member)) {
+            return null;
+        }
+
+        $candidates = [
+            data_get($member, 'name'),
+            data_get($member, 'fullName'),
+            data_get($member, 'full_name'),
+            data_get($member, 'displayName'),
+            data_get($member, 'display_name'),
+            trim(implode(' ', array_filter([
+                data_get($member, 'firstName'),
+                data_get($member, 'middleName'),
+                data_get($member, 'lastName'),
+            ], fn ($part): bool => filled($part)))),
+            trim(implode(' ', array_filter([
+                data_get($member, 'first_name'),
+                data_get($member, 'middle_name'),
+                data_get($member, 'last_name'),
+            ], fn ($part): bool => filled($part)))),
+            data_get($member, 'email'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $name = trim((string) $candidate);
+
+            if ($name !== '' && ! $this->shouldReplaceEmployeeName($name)) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    protected function shouldReplaceEmployeeName(string $name): bool
+    {
+        $name = trim($name);
+
+        return $name === ''
+            || Str::of($name)->lower()->startsWith('weeek user')
+            || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $name) === 1;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    protected function employeeAttributes(array $attributes): array
+    {
+        return array_filter(
+            $attributes,
+            fn (mixed $value, string $column): bool => Schema::hasColumn('employees', $column),
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     protected function resolveProjectId(SourceConnection $connection, array $payload): ?int
