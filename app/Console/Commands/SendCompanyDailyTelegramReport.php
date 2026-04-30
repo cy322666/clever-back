@@ -80,7 +80,6 @@ class SendCompanyDailyTelegramReport extends Command
     protected function message(AnalyticsPeriod $period, ProjectLimitMonitorService $projectLimitMonitor): string
     {
         $finance = $this->financeSummary($period);
-        $sales = $this->salesSummary($period);
         $production = $this->productionSummary($period);
         $projectLoad = $projectLimitMonitor->projectRows();
         $overLimit = $projectLoad->filter(fn (array $row): bool => (float) $row['utilization_pct'] >= 100);
@@ -93,10 +92,6 @@ class SendCompanyDailyTelegramReport extends Command
             '<b>Финансы</b>',
             'Выручка: <b>'.$this->money($finance['revenue']).'</b>',
             'Чистыми: <b>'.$this->money($finance['net_revenue']).'</b>',
-            '',
-            '<b>Продажи</b>',
-            'Успешные сделки: <b>'.number_format($sales['won_count'], 0, ',', ' ').'</b> на <b>'.$this->money($sales['won_amount']).'</b>',
-            'Новых сделок: <b>'.number_format($sales['new_count'], 0, ',', ' ').'</b>',
             '',
             '<b>Производство</b>',
             'Отработано: <b>'.number_format($production['hours'], 1, ',', ' ').' ч</b>',
