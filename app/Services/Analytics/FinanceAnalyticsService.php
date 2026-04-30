@@ -125,7 +125,15 @@ class FinanceAnalyticsService extends AnalyticsService
                         nullif(trim(revenue_transactions.note), ''),
                         'Без клиента'
                     )
-                ) as counterparty_net_value
+                ) as counterparty_net_value,
+                count(*) over (
+                    partition by coalesce(
+                        nullif(trim(clients.name), ''),
+                        nullif(trim(bank_statement_rows.counterparty_name), ''),
+                        nullif(trim(revenue_transactions.note), ''),
+                        'Без клиента'
+                    )
+                ) as counterparty_transactions_count
             ")
             ->leftJoin('clients', 'clients.id', '=', 'revenue_transactions.client_id')
             ->leftJoin('bank_statement_rows', 'bank_statement_rows.id', '=', 'revenue_transactions.bank_statement_row_id')

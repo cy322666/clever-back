@@ -12,7 +12,7 @@ use Filament\Tables\Table;
 
 class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Клиенты по выручке за период';
+    protected static ?string $heading = 'Поступления по контрагентам за период';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -39,6 +39,7 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
             'net_profit_percent' => (string) (int) round((float) ($row->net_profit_percent ?? 100)),
             'counterparty_value' => (float) ($row->counterparty_value ?? 0),
             'counterparty_net_value' => (float) ($row->counterparty_net_value ?? 0),
+            'counterparty_transactions_count' => (int) ($row->counterparty_transactions_count ?? 1),
         ])->all();
     }
 
@@ -52,7 +53,9 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(fn (array $record): string => (string) $record['counterparty'])
                     ->getDescriptionFromRecordUsing(function (array $record): string {
-                        return 'Выручка: '
+                        return 'Поступлений: '
+                            . number_format((int) ($record['counterparty_transactions_count'] ?? 1), 0, ',', ' ')
+                            . ' · Выручка: '
                             . number_format((float) $record['counterparty_value'], 0, ',', ' ')
                             . ' ₽ · Чистыми: '
                             . number_format((float) $record['counterparty_net_value'], 0, ',', ' ')
@@ -61,7 +64,6 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
             ])
             ->defaultGroup('counterparty')
             ->groupingSettingsHidden()
-            ->collapsedGroupsByDefault()
             ->paginated(false);
     }
 
