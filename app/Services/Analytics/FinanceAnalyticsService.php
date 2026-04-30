@@ -60,13 +60,12 @@ class FinanceAnalyticsService extends AnalyticsService
             ->limit(8)
             ->get();
 
-        $topClients = RevenueTransaction::query()
+        $clientsByRevenue = RevenueTransaction::query()
             ->selectRaw('clients.name as label, sum(revenue_transactions.amount) as value')
             ->join('clients', 'clients.id', '=', 'revenue_transactions.client_id')
             ->whereBetween('posted_at', [$period->from, $period->to])
             ->groupBy('clients.name')
             ->orderByDesc('value')
-            ->limit(8)
             ->get();
 
         $lowMarginClients = Client::query()
@@ -85,7 +84,7 @@ class FinanceAnalyticsService extends AnalyticsService
                 'expense_categories' => $this->namedSeries($expenseCats),
                 'revenue_channels' => $this->namedSeries($revenueCats),
             ],
-            'top_clients' => $topClients,
+            'top_clients' => $clientsByRevenue,
             'low_margin_clients' => $lowMarginClients,
             'period' => $period,
         ];

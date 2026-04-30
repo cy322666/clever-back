@@ -8,7 +8,7 @@ use Filament\Tables\Columns\TextColumn;
 
 class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Топ клиентов по выручке';
+    protected static ?string $heading = 'Клиенты по выручке за период';
 
     protected int | string | array $columnSpan = 'full';
 
