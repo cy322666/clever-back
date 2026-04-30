@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Pages\Production;
 use App\Models\Employee;
 use App\Services\Analytics\ProductionAnalyticsService;
 use App\Support\AnalyticsPeriod;
@@ -187,7 +188,7 @@ class EmployeeProductionChartWidget extends ChartWidget
             unset($query['employee']);
         }
 
-        $this->redirect(request()->url() . '?' . http_build_query($query), navigate: true);
+        $this->redirect(Production::getUrl($query));
     }
 
     private function resolvePeriod(): AnalyticsPeriod
