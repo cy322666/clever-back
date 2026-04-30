@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Models\Client;
+use App\Models\Employee;
 use App\Models\ExpenseTransaction;
 use App\Models\RevenueTransaction;
 use App\Support\AnalyticsPeriod;
@@ -22,17 +23,17 @@ class FinanceAnalyticsService extends AnalyticsService
 
         $expenses = ExpenseTransaction::query()
             ->whereBetween('posted_at', [$period->from, $period->to]);
-        $previousExpenses = ExpenseTransaction::query()
-            ->whereBetween('posted_at', [$previousPeriod->from, $previousPeriod->to]);
-
         $cashIn = (float) (clone $revenues)->sum('amount');
-        $cashOut = (float) (clone $expenses)->sum('amount');
         $netProfitSql = $this->netProfitAmountSql();
         $netProfitIn = (float) (clone $revenues)->selectRaw("coalesce(sum({$netProfitSql}), 0) as total")->value('total');
-        $grossMarginPct = $cashIn > 0 ? round(($netProfitIn / $cashIn) * 100, 1) : 0;
+        $payrollCost = $this->payrollCostForPeriod($period);
+        $grossMarginAmount = $netProfitIn - $payrollCost;
+        $grossMarginPct = $cashIn > 0 ? round(($grossMarginAmount / $cashIn) * 100, 1) : 0;
         $previousCashIn = (float) (clone $previousRevenues)->sum('amount');
         $previousNetProfitIn = (float) (clone $previousRevenues)->selectRaw("coalesce(sum({$netProfitSql}), 0) as total")->value('total');
-        $previousGrossMarginPct = $previousCashIn > 0 ? round(($previousNetProfitIn / $previousCashIn) * 100, 1) : 0;
+        $previousPayrollCost = $this->payrollCostForPeriod($previousPeriod);
+        $previousGrossMarginAmount = $previousNetProfitIn - $previousPayrollCost;
+        $previousGrossMarginPct = $previousCashIn > 0 ? round(($previousGrossMarginAmount / $previousCashIn) * 100, 1) : 0;
 
         $incomeByDay = (clone $revenues)
             ->selectRaw("date_trunc('day', posted_at)::date as date, sum(amount) as total")
@@ -149,7 +150,7 @@ class FinanceAnalyticsService extends AnalyticsService
             'kpis' => [
                 ['label' => 'Выручка', 'value' => number_format($cashIn, 0, ',', ' '), 'hint' => 'Все поступления за период', 'tone' => 'emerald', 'comparison' => $this->compareValues($cashIn, $previousCashIn)],
                 ['label' => 'Чистыми', 'value' => number_format($netProfitIn, 0, ',', ' '), 'hint' => 'По доле чистыми в поступлениях', 'tone' => 'cyan', 'comparison' => $this->compareValues($netProfitIn, $previousNetProfitIn)],
-                ['label' => 'Маржинальность', 'value' => number_format($grossMarginPct, 1, ',', ' ').'%', 'hint' => 'Валовая', 'tone' => 'brand', 'comparison' => $this->compareValues($grossMarginPct, $previousGrossMarginPct)],
+                ['label' => 'Маржинальность', 'value' => number_format($grossMarginPct, 1, ',', ' ').'%', 'hint' => 'Чистыми минус зарплаты', 'tone' => 'brand', 'comparison' => $this->compareValues($grossMarginPct, $previousGrossMarginPct)],
             ],
             'charts' => [
                 'cash_in' => $this->dailySeries($period, $incomeByDay, 'date', 'total'),
@@ -175,5 +176,22 @@ class FinanceAnalyticsService extends AnalyticsService
         return Schema::hasColumn('revenue_transactions', 'net_profit_percent')
             ? 'coalesce(revenue_transactions.net_profit_percent, 100)'
             : '100';
+    }
+
+    private function payrollCostForPeriod(AnalyticsPeriod $period): float
+    {
+        $monthlyPayroll = (float) Employee::query()
+            ->where('is_active', true)
+            ->whereNotNull('salary_amount')
+            ->sum('salary_amount');
+
+        if ($monthlyPayroll <= 0) {
+            return 0;
+        }
+
+        $daysInPeriod = max(1, $period->from->diffInDays($period->to) + 1);
+        $daysInMonth = max(1, $period->from->daysInMonth);
+
+        return round($monthlyPayroll * ($daysInPeriod / $daysInMonth), 2);
     }
 }
