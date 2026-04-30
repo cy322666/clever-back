@@ -16,6 +16,7 @@ class RevenueTransaction extends Model
         'transaction_date',
         'posted_at',
         'amount',
+        'net_profit_percent',
         'currency',
         'category',
         'channel',
@@ -31,6 +32,7 @@ class RevenueTransaction extends Model
             'transaction_date' => 'datetime',
             'posted_at' => 'datetime',
             'amount' => 'decimal:2',
+            'net_profit_percent' => 'decimal:2',
             'is_recurring' => 'boolean',
             'metadata' => 'array',
         ];

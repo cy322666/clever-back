@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\ExpenseTransaction;
 use App\Models\RevenueTransaction;
 use App\Support\AnalyticsPeriod;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class FinanceAnalyticsService extends AnalyticsService
 {
@@ -27,12 +27,15 @@ class FinanceAnalyticsService extends AnalyticsService
 
         $cashIn = (float) (clone $revenues)->sum('amount');
         $cashOut = (float) (clone $expenses)->sum('amount');
-        $grossMargin = $cashIn - $cashOut;
-        $grossMarginPct = $cashIn > 0 ? round(($grossMargin / $cashIn) * 100, 1) : 0;
+        $netProfitSql = $this->netProfitAmountSql();
+        $netProfitIn = (float) (clone $revenues)->selectRaw("coalesce(sum({$netProfitSql}), 0) as total")->value('total');
+        $netCashflow = $netProfitIn - $cashOut;
+        $grossMarginPct = $cashIn > 0 ? round(($netProfitIn / $cashIn) * 100, 1) : 0;
         $previousCashIn = (float) (clone $previousRevenues)->sum('amount');
         $previousCashOut = (float) (clone $previousExpenses)->sum('amount');
-        $previousGrossMargin = $previousCashIn - $previousCashOut;
-        $previousGrossMarginPct = $previousCashIn > 0 ? round(($previousGrossMargin / $previousCashIn) * 100, 1) : 0;
+        $previousNetProfitIn = (float) (clone $previousRevenues)->selectRaw("coalesce(sum({$netProfitSql}), 0) as total")->value('total');
+        $previousNetCashflow = $previousNetProfitIn - $previousCashOut;
+        $previousGrossMarginPct = $previousCashIn > 0 ? round(($previousNetProfitIn / $previousCashIn) * 100, 1) : 0;
 
         $incomeByDay = (clone $revenues)
             ->selectRaw("date_trunc('day', posted_at)::date as date, sum(amount) as total")
@@ -68,7 +71,11 @@ class FinanceAnalyticsService extends AnalyticsService
                     nullif(trim(revenue_transactions.note), ''),
                     'Без клиента'
                 ) as label,
-                sum(revenue_transactions.amount) as value
+                sum(revenue_transactions.amount) as value,
+                sum({$netProfitSql}) as net_value,
+                string_agg(revenue_transactions.id::text, ',') as revenue_ids,
+                min({$this->netProfitPercentSql()}) as min_net_profit_percent,
+                max({$this->netProfitPercentSql()}) as max_net_profit_percent
             ")
             ->leftJoin('clients', 'clients.id', '=', 'revenue_transactions.client_id')
             ->leftJoin('bank_statement_rows', 'bank_statement_rows.id', '=', 'revenue_transactions.bank_statement_row_id')
@@ -91,8 +98,9 @@ class FinanceAnalyticsService extends AnalyticsService
 
         return [
             'kpis' => [
-                ['label' => 'Поступления', 'value' => number_format($cashIn, 0, ',', ' '), 'hint' => 'За период', 'tone' => 'emerald', 'comparison' => $this->compareValues($cashIn, $previousCashIn)],
-                ['label' => 'Чистый поток', 'value' => number_format($grossMargin, 0, ',', ' '), 'hint' => 'Cashflow', 'tone' => $grossMargin >= 0 ? 'cyan' : 'amber', 'comparison' => $this->compareValues($grossMargin, $previousGrossMargin)],
+                ['label' => 'Выручка', 'value' => number_format($cashIn, 0, ',', ' '), 'hint' => 'Все поступления за период', 'tone' => 'emerald', 'comparison' => $this->compareValues($cashIn, $previousCashIn)],
+                ['label' => 'Чистыми', 'value' => number_format($netProfitIn, 0, ',', ' '), 'hint' => 'По доле чистыми в поступлениях', 'tone' => 'cyan', 'comparison' => $this->compareValues($netProfitIn, $previousNetProfitIn)],
+                ['label' => 'Чистый поток', 'value' => number_format($netCashflow, 0, ',', ' '), 'hint' => 'Чистыми минус расходы', 'tone' => $netCashflow >= 0 ? 'cyan' : 'amber', 'comparison' => $this->compareValues($netCashflow, $previousNetCashflow)],
                 ['label' => 'Маржинальность', 'value' => number_format($grossMarginPct, 1, ',', ' ').'%', 'hint' => 'Валовая', 'tone' => 'brand', 'comparison' => $this->compareValues($grossMarginPct, $previousGrossMarginPct)],
             ],
             'charts' => [
@@ -104,5 +112,19 @@ class FinanceAnalyticsService extends AnalyticsService
             'low_margin_clients' => $lowMarginClients,
             'period' => $period,
         ];
+    }
+
+    private function netProfitAmountSql(): string
+    {
+        return Schema::hasColumn('revenue_transactions', 'net_profit_percent')
+            ? 'revenue_transactions.amount * coalesce(revenue_transactions.net_profit_percent, 100) / 100.0'
+            : 'revenue_transactions.amount';
+    }
+
+    private function netProfitPercentSql(): string
+    {
+        return Schema::hasColumn('revenue_transactions', 'net_profit_percent')
+            ? 'coalesce(revenue_transactions.net_profit_percent, 100)'
+            : '100';
     }
 }
