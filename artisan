@@ -5,6 +5,64 @@ use Symfony\Component\Console\Input\ArgvInput;
 
 define('LARAVEL_START', microtime(true));
 
+function owner_analytics_vendor_is_valid(string $vendorPath): bool
+{
+    $autoloadPath = $vendorPath.'/autoload.php';
+
+    if (! is_file($autoloadPath)) {
+        return false;
+    }
+
+    $command = PHP_BINARY.' -r '.escapeshellarg('require '.var_export($autoloadPath, true).';').' >/dev/null 2>&1';
+    exec($command, $output, $exitCode);
+
+    return $exitCode === 0;
+}
+
+function owner_analytics_restore_vendor(string $sourcePath, string $targetPath): bool
+{
+    if (! owner_analytics_vendor_is_valid($sourcePath)) {
+        return false;
+    }
+
+    $command = sprintf(
+        'rm -rf %s && mkdir -p %s && cp -R %s/. %s/',
+        escapeshellarg($targetPath),
+        escapeshellarg($targetPath),
+        escapeshellarg($sourcePath),
+        escapeshellarg($targetPath),
+    );
+
+    exec($command, $output, $exitCode);
+
+    return $exitCode === 0 && owner_analytics_vendor_is_valid($targetPath);
+}
+
+function owner_analytics_install_vendor(string $basePath): bool
+{
+    $command = 'cd '.escapeshellarg($basePath).' && composer install '
+        .'--no-dev --no-interaction --no-scripts --prefer-dist '
+        .'--ignore-platform-req=ext-gd --ignore-platform-req=ext-intl';
+
+    passthru($command, $exitCode);
+
+    return $exitCode === 0 && owner_analytics_vendor_is_valid($basePath.'/vendor');
+}
+
+$basePath = __DIR__;
+$vendorPath = $basePath.'/vendor';
+
+if (! owner_analytics_vendor_is_valid($vendorPath)) {
+    fwrite(STDERR, "Vendor is missing or broken, repairing...\n");
+
+    if (! owner_analytics_restore_vendor('/opt/vendor', $vendorPath)
+        && ! owner_analytics_install_vendor($basePath)
+    ) {
+        fwrite(STDERR, "Unable to repair vendor. Run composer install in {$basePath}.\n");
+        exit(1);
+    }
+}
+
 require __DIR__.'/vendor/autoload.php';
 
 $app = require_once __DIR__.'/bootstrap/app.php';
