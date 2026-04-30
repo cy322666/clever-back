@@ -10,7 +10,7 @@ class BankImportConnector implements SourceConnector
 {
     public function supports(string $driver): bool
     {
-        return in_array($driver, ['bank-import', 'bank', 'tochka'], true);
+        return in_array($driver, ['bank-import', 'bank'], true);
     }
 
     public function sync(SourceConnection $connection): SyncResult

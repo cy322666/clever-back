@@ -20,4 +20,13 @@ return [
         'base_url' => env('WEEEK_BASE_URL'),
         'token' => env('WEEEK_TOKEN'),
     ],
+    'tochka' => [
+        'base_url' => env('TOCHKA_BASE_URL', 'https://enter.tochka.com/uapi'),
+        'token' => env('TOCHKA_TOKEN'),
+        'bank_account' => env('TOCHKA_BANK_ACCOUNT'),
+        'sync_window_days' => env('TOCHKA_SYNC_WINDOW_DAYS', env('INTEGRATION_DEFAULT_SYNC_WINDOW_DAYS', 30)),
+        'poll_attempts' => env('TOCHKA_POLL_ATTEMPTS', 6),
+        'poll_seconds' => env('TOCHKA_POLL_SECONDS', 2),
+        'timeout' => env('TOCHKA_TIMEOUT', 30),
+    ],
 ];

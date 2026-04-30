@@ -18,9 +18,9 @@ class SyncSources extends Command
     {
         try {
             $this->info('Looking for enabled source connections...');
+            $bootstrapper->ensureDefaults();
 
             if ($this->option('all') || $this->argument('source') === null) {
-                $bootstrapper->ensureDefaults();
                 $connections = SourceConnection::query()
                     ->where('is_enabled', true)
                     ->whereIn('source_key', array_keys(config('integrations.sources', [])))
@@ -59,14 +59,37 @@ class SyncSources extends Command
 
                 return self::SUCCESS;
             }
+
+            $sourceKey = (string) $this->argument('source');
+            $connection = SourceConnection::query()
+                ->where('source_key', $sourceKey)
+                ->where('is_enabled', true)
+                ->first();
+
+            if (! $connection) {
+                $this->warn("Enabled source {$sourceKey} was not found.");
+
+                return self::SUCCESS;
+            }
+
+            $this->info("Syncing {$connection->source_key} ({$connection->name})...");
+            $log = $service->syncConnection($connection);
+            $this->line(sprintf(
+                '[%s] %s -> %s (pulled: %d, created: %d, updated: %d, errors: %d)',
+                $connection->source_key,
+                $connection->name,
+                $log->status,
+                $log->pulled_count,
+                $log->created_count,
+                $log->updated_count,
+                $log->error_count
+            ));
+
+            return self::SUCCESS;
         } catch (Throwable $throwable) {
             $this->warn($throwable->getMessage());
 
             return self::SUCCESS;
         }
-
-        $this->warn('Single-source sync is scaffolded; use --all to sync the default sources.');
-
-        return self::SUCCESS;
     }
 }

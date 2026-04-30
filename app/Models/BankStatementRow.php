@@ -9,6 +9,8 @@ class BankStatementRow extends Model
 {
     protected $fillable = [
         'data_import_batch_id',
+        'source_key',
+        'external_id',
         'occurred_at',
         'amount',
         'direction',

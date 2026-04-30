@@ -6,6 +6,7 @@ use App\Models\SourceConnection;
 use App\Models\SourceSyncLog;
 use App\Services\Integrations\Connectors\AmoCrmConnector;
 use App\Services\Integrations\Connectors\BankImportConnector;
+use App\Services\Integrations\Connectors\TochkaBankConnector;
 use App\Services\Integrations\Connectors\WeeekConnector;
 use Throwable;
 
@@ -107,6 +108,7 @@ class SourceSyncService
     {
         $connectors = [
             app(AmoCrmConnector::class),
+            app(TochkaBankConnector::class),
             app(BankImportConnector::class),
             app(WeeekConnector::class),
         ];
