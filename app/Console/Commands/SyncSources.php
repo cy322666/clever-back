@@ -52,6 +52,10 @@ class SyncSources extends Command
                         $log->updated_count,
                         $log->error_count
                     ));
+
+                    if ($log->error_count > 0 && filled($log->error_message)) {
+                        $this->warn('  Error: '.$log->error_message);
+                    }
                 }
 
                 $successCount = collect($results)->filter(fn ($result) => $result['log']->error_count === 0)->count();
@@ -84,6 +88,10 @@ class SyncSources extends Command
                 $log->updated_count,
                 $log->error_count
             ));
+
+            if ($log->error_count > 0 && filled($log->error_message)) {
+                $this->warn('  Error: '.$log->error_message);
+            }
 
             return self::SUCCESS;
         } catch (Throwable $throwable) {
