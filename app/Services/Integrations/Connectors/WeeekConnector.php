@@ -13,6 +13,7 @@ use App\Services\Alerts\ProjectLimitMonitorService;
 use App\Services\Integrations\Contracts\SourceConnector;
 use App\Services\Integrations\SyncResult;
 use Carbon\CarbonImmutable;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Str;
 use Psr\Http\Client\ClientExceptionInterface;
 use Throwable;
@@ -232,7 +233,12 @@ class WeeekConnector
             return null;
         }
 
-        return new WeeekClient($token, $baseUrl !== '' ? $baseUrl : null);
+        $httpClient = new GuzzleClient([
+            'connect_timeout' => (float) ($settings['connect_timeout'] ?? 10),
+            'timeout' => (float) ($settings['timeout'] ?? 30),
+        ]);
+
+        return new WeeekClient($token, $baseUrl !== '' ? $baseUrl : null, $httpClient);
     }
 
     protected function normalizedBaseUrl(string $baseUrl): string

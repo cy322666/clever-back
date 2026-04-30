@@ -20,6 +20,8 @@ return [
     'weeek' => [
         'base_url' => env('WEEEK_BASE_URL'),
         'token' => env('WEEEK_TOKEN'),
+        'connect_timeout' => env('WEEEK_CONNECT_TIMEOUT', 10),
+        'timeout' => env('WEEEK_TIMEOUT', 30),
     ],
     'tochka' => [
         'base_url' => env('TOCHKA_BASE_URL', 'https://enter.tochka.com/uapi'),
