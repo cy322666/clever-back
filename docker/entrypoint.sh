@@ -1,10 +1,24 @@
 #!/bin/sh
 set -e
 
-if [ -d /opt/vendor ] && { [ "$APP_ENV" = "production" ] || [ ! -f /var/www/html/vendor/autoload.php ]; }; then
+restore_vendor() {
     rm -rf /var/www/html/vendor
     mkdir -p /var/www/html/vendor
     cp -R /opt/vendor/. /var/www/html/vendor/
+}
+
+if [ -d /opt/vendor ] && {
+    [ "$APP_ENV" = "production" ] ||
+    [ ! -f /var/www/html/vendor/autoload.php ] ||
+    [ ! -f /var/www/html/vendor/symfony/deprecation-contracts/function.php ] ||
+    ! php -r "require '/var/www/html/vendor/autoload.php';" >/dev/null 2>&1
+}; then
+    restore_vendor
+fi
+
+if [ -d /opt/vendor ] && ! php -r "require '/var/www/html/vendor/autoload.php';" >/dev/null 2>&1; then
+    restore_vendor
+    php -r "require '/var/www/html/vendor/autoload.php';"
 fi
 
 if [ -d /opt/build ] && { [ "$APP_ENV" = "production" ] || [ ! -f /var/www/html/public/build/manifest.json ]; }; then

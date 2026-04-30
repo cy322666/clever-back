@@ -36,6 +36,7 @@ COPY --from=assets /app/public/build /var/www/html/public/build
 COPY --from=assets /app/public/build /opt/build
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+RUN php -r "require 'vendor/autoload.php';"
 RUN rm -f bootstrap/cache/*.php
 RUN chmod +x artisan
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

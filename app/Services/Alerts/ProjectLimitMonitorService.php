@@ -92,7 +92,7 @@ class ProjectLimitMonitorService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    protected function projectRows(): Collection
+    public function projectRows(): Collection
     {
         $projects = Project::query()
             ->with(['client', 'supportContract'])

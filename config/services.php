@@ -29,4 +29,9 @@ return [
         'poll_seconds' => env('TOCHKA_POLL_SECONDS', 2),
         'timeout' => env('TOCHKA_TIMEOUT', 30),
     ],
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'),
+        'timeout' => env('TELEGRAM_TIMEOUT', 15),
+    ],
 ];
