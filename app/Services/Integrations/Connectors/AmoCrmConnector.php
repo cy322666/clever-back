@@ -339,13 +339,18 @@ class AmoCrmConnector
     {
         return array_merge(
             config('services.amo') ?? [],
-            is_array($connection->settings ?? null) ? $connection->settings : []
+            $this->filledSettings(is_array($connection->settings ?? null) ? $connection->settings : [])
         );
     }
 
     protected function isConfigured(array $settings): bool
     {
         return filled($settings['base_url'] ?? null) && filled($settings['access_token'] ?? null);
+    }
+
+    protected function filledSettings(array $settings): array
+    {
+        return array_filter($settings, fn ($value): bool => filled($value));
     }
 
     /**

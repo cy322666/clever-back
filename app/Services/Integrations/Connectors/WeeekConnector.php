@@ -32,6 +32,10 @@ class WeeekConnector
     {
         $settings = $this->resolveSettings($connection);
 
+        if (! filled($settings['token'] ?? null)) {
+            return SyncResult::fail('Weeek is not configured: WEEEK_TOKEN is required');
+        }
+
         return $this->syncWithSettings($connection, $settings);
     }
 
@@ -191,8 +195,13 @@ class WeeekConnector
     {
         return array_merge(
             config('services.weeek') ?? [],
-            is_array($connection->settings ?? null) ? $connection->settings : []
+            $this->filledSettings(is_array($connection->settings ?? null) ? $connection->settings : [])
         );
+    }
+
+    protected function filledSettings(array $settings): array
+    {
+        return array_filter($settings, fn ($value): bool => filled($value));
     }
 
     protected function syncTaskTimeEntries(SourceConnection $connection, Task $task, array $payload, array $memberNames = []): void

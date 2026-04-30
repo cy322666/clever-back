@@ -21,6 +21,8 @@ class SourceConnectionBootstrapper
 
             $existingSettings = is_array($existing?->settings ?? null) ? $existing->settings : [];
             $defaultSettings = is_array(config("services.{$key}") ?? null) ? config("services.{$key}") : [];
+            $existingSettings = array_filter($existingSettings, fn ($value): bool => filled($value));
+            $defaultSettings = array_filter($defaultSettings, fn ($value): bool => filled($value));
 
             return SourceConnection::query()->updateOrCreate(
                 [

@@ -322,7 +322,7 @@ class TochkaBankConnector implements SourceConnector
         return array_merge(
             config('services.tochka', []),
             config("services.{$connection->source_key}", []),
-            is_array($connection->settings ?? null) ? $connection->settings : [],
+            $this->filledSettings(is_array($connection->settings ?? null) ? $connection->settings : []),
         );
     }
 
@@ -331,6 +331,11 @@ class TochkaBankConnector implements SourceConnector
         return filled($settings['base_url'] ?? null)
             && filled($settings['token'] ?? null)
             && filled($settings['bank_account'] ?? null);
+    }
+
+    protected function filledSettings(array $settings): array
+    {
+        return array_filter($settings, fn ($value): bool => filled($value));
     }
 
     protected function toFloat(mixed $value): float
