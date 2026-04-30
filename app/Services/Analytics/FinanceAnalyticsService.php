@@ -29,12 +29,9 @@ class FinanceAnalyticsService extends AnalyticsService
         $cashOut = (float) (clone $expenses)->sum('amount');
         $netProfitSql = $this->netProfitAmountSql();
         $netProfitIn = (float) (clone $revenues)->selectRaw("coalesce(sum({$netProfitSql}), 0) as total")->value('total');
-        $netCashflow = $netProfitIn - $cashOut;
         $grossMarginPct = $cashIn > 0 ? round(($netProfitIn / $cashIn) * 100, 1) : 0;
         $previousCashIn = (float) (clone $previousRevenues)->sum('amount');
-        $previousCashOut = (float) (clone $previousExpenses)->sum('amount');
         $previousNetProfitIn = (float) (clone $previousRevenues)->selectRaw("coalesce(sum({$netProfitSql}), 0) as total")->value('total');
-        $previousNetCashflow = $previousNetProfitIn - $previousCashOut;
         $previousGrossMarginPct = $previousCashIn > 0 ? round(($previousNetProfitIn / $previousCashIn) * 100, 1) : 0;
 
         $incomeByDay = (clone $revenues)
@@ -152,7 +149,6 @@ class FinanceAnalyticsService extends AnalyticsService
             'kpis' => [
                 ['label' => 'Выручка', 'value' => number_format($cashIn, 0, ',', ' '), 'hint' => 'Все поступления за период', 'tone' => 'emerald', 'comparison' => $this->compareValues($cashIn, $previousCashIn)],
                 ['label' => 'Чистыми', 'value' => number_format($netProfitIn, 0, ',', ' '), 'hint' => 'По доле чистыми в поступлениях', 'tone' => 'cyan', 'comparison' => $this->compareValues($netProfitIn, $previousNetProfitIn)],
-                ['label' => 'Чистый поток', 'value' => number_format($netCashflow, 0, ',', ' '), 'hint' => 'Чистыми минус расходы', 'tone' => $netCashflow >= 0 ? 'cyan' : 'amber', 'comparison' => $this->compareValues($netCashflow, $previousNetCashflow)],
                 ['label' => 'Маржинальность', 'value' => number_format($grossMarginPct, 1, ',', ' ').'%', 'hint' => 'Валовая', 'tone' => 'brand', 'comparison' => $this->compareValues($grossMarginPct, $previousGrossMarginPct)],
             ],
             'charts' => [
