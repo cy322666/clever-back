@@ -62,6 +62,9 @@ class AmoCrmConnector
             ->values()
             ->all();
         $warnings = [];
+        $pulled = 0;
+        $created = 0;
+        $updated = 0;
 
         foreach ($pipelineIds as $pipelineId) {
             try {
@@ -84,7 +87,7 @@ class AmoCrmConnector
                     $client = $this->upsertAmoCompanyClient($company, data_get($lead, 'name'));
                 }
 
-                SalesLead::query()->updateOrCreate(
+                $leadModel = SalesLead::query()->updateOrCreate(
                     [
                         'external_id' => data_get($lead, 'id'),
                     ],
@@ -103,16 +106,20 @@ class AmoCrmConnector
                         ],
                     ]
                 );
+                $pulled++;
+                $leadModel->wasRecentlyCreated ? $created++ : $updated++;
 
                 $catalogElement = data_get($lead, '_embedded.catalog_elements.0');
 
                 if (is_array($catalogElement)) {
-                    $this->upsertLinkedProduct(
+                    $productModel = $this->upsertLinkedProduct(
                         $connection,
                         'lead',
                         $lead,
                         $catalogElement,
                     );
+                    $pulled++;
+                    $productModel->wasRecentlyCreated ? $created++ : $updated++;
                 }
             }
             } catch (Throwable $throwable) {
@@ -139,7 +146,7 @@ class AmoCrmConnector
                 $client = $this->upsertAmoCompanyClient($company, data_get($customer, 'name'));
             }
 
-            Buyer::query()->updateOrCreate([
+            $buyerModel = Buyer::query()->updateOrCreate([
                 'external_id' => data_get($customer, 'id'),
             ], [
                 'client_id' => $client?->id,
@@ -155,16 +162,20 @@ class AmoCrmConnector
                     'amo_customer' => $customer,
                 ],
             ]);
+            $pulled++;
+            $buyerModel->wasRecentlyCreated ? $created++ : $updated++;
 
             $catalogElement = data_get($customer, '_embedded.catalog_elements.0');
 
             if (is_array($catalogElement)) {
-                $this->upsertLinkedProduct(
+                $productModel = $this->upsertLinkedProduct(
                     $connection,
                     'customer',
                     $customer,
                     $catalogElement,
                 );
+                $pulled++;
+                $productModel->wasRecentlyCreated ? $created++ : $updated++;
             }
         }
 
@@ -183,6 +194,8 @@ class AmoCrmConnector
                     'amo_company' => $company,
                 ]);
                 $companyModel->save();
+                $pulled++;
+                $updated++;
             } catch (Throwable $throwable) {
                 report($throwable);
                 $warnings[] = 'Company '.$companyModel->external_id.': '.$throwable->getMessage();
@@ -218,6 +231,8 @@ class AmoCrmConnector
                 ]);
 
                 $productModel->save();
+                $pulled++;
+                $updated++;
             } catch (\Throwable $e) {
                 report($e);
                 $warnings[] = 'Product '.$productModel->external_id.': '.$e->getMessage();
@@ -244,9 +259,9 @@ class AmoCrmConnector
         }
 
         return SyncResult::ok(
-            $invoiceStats['pulled'] ?? 0,
-            $invoiceStats['created'] ?? 0,
-            $invoiceStats['updated'] ?? 0,
+            $pulled + ($invoiceStats['pulled'] ?? 0),
+            $created + ($invoiceStats['created'] ?? 0),
+            $updated + ($invoiceStats['updated'] ?? 0),
             ['invoices' => $invoiceStats, 'warnings' => $warnings]
         );
     }
