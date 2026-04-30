@@ -5,8 +5,10 @@ namespace App\Filament\Widgets;
 use App\Models\RevenueTransaction;
 use App\Services\Analytics\FinanceAnalyticsService;
 use App\Support\AnalyticsPeriod;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
 {
@@ -25,22 +27,55 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
     protected function rows(): array
     {
         $period = $this->resolvePeriod();
-        $rows = app(FinanceAnalyticsService::class)->build($period)['top_clients'] ?? collect();
+        $rows = app(FinanceAnalyticsService::class)->build($period)['revenue_transactions'] ?? collect();
 
         return $rows->map(fn ($row) => is_array($row) ? $row : [
-            'id' => md5((string) ($row->label ?? $row->name ?? '—')),
-            'label' => $row->label ?? $row->name ?? '—',
+            'id' => (int) $row->id,
+            'counterparty' => $row->counterparty ?? 'Без клиента',
+            'payment_label' => $row->payment_label ?? 'Поступление',
+            'posted_at' => $row->posted_at,
             'value' => (float) ($row->value ?? 0),
-            'net_value' => (float) ($row->net_value ?? $row->value ?? 0),
-            'net_profit_percent' => $this->normalizeNetProfitPercent($row),
-            'revenue_ids' => array_values(array_filter(explode(',', (string) ($row->revenue_ids ?? '')))),
+            'net_value' => (float) ($row->net_value ?? 0),
+            'net_profit_percent' => (string) (int) round((float) ($row->net_profit_percent ?? 100)),
+            'counterparty_value' => (float) ($row->counterparty_value ?? 0),
+            'counterparty_net_value' => (float) ($row->counterparty_net_value ?? 0),
         ])->all();
+    }
+
+    public function table(Table $table): Table
+    {
+        return parent::table($table)
+            ->groups([
+                Group::make('counterparty')
+                    ->label('Контрагент')
+                    ->collapsible()
+                    ->titlePrefixedWithLabel(false)
+                    ->getTitleFromRecordUsing(fn (array $record): string => (string) $record['counterparty'])
+                    ->getDescriptionFromRecordUsing(function (array $record): string {
+                        return 'Выручка: '
+                            . number_format((float) $record['counterparty_value'], 0, ',', ' ')
+                            . ' ₽ · Чистыми: '
+                            . number_format((float) $record['counterparty_net_value'], 0, ',', ' ')
+                            . ' ₽';
+                    }),
+            ])
+            ->defaultGroup('counterparty')
+            ->groupingSettingsHidden()
+            ->collapsedGroupsByDefault()
+            ->paginated(false);
     }
 
     protected function getTableColumns(): array
     {
         return [
-            TextColumn::make('label')->label('Клиент')->wrap(),
+            TextColumn::make('posted_at')
+                ->label('Дата')
+                ->dateTime('d.m.Y')
+                ->sortable(),
+            TextColumn::make('payment_label')
+                ->label('Поступление')
+                ->wrap()
+                ->limit(90),
             TextColumn::make('value')->label('Выручка')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             SelectColumn::make('net_profit_percent')
                 ->label('Доля чистыми')
@@ -49,37 +84,25 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
                     '50' => '50%',
                     '100' => '100%',
                 ])
-                ->placeholder('Разные')
-                ->updateStateUsing(function ($state, array $record): ?string {
-                    $this->updateNetProfitPercent($record['revenue_ids'] ?? [], (float) $state);
+                ->selectablePlaceholder(false)
+                ->updateStateUsing(function ($state, array $record): string {
+                    $this->updateNetProfitPercent((int) $record['id'], (float) $state);
 
-                    return is_numeric($state) ? (string) (int) $state : null;
+                    return is_numeric($state) ? (string) (int) $state : '100';
                 }),
             TextColumn::make('net_value')->label('Чистыми')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
         ];
     }
 
-    protected function updateNetProfitPercent(array $revenueIds, float $percent): void
+    protected function updateNetProfitPercent(int $revenueId, float $percent): void
     {
-        if ($revenueIds === [] || ! in_array((int) $percent, [30, 50, 100], true)) {
+        if ($revenueId <= 0 || ! in_array((int) $percent, [30, 50, 100], true)) {
             return;
         }
 
         RevenueTransaction::query()
-            ->whereIn('id', $revenueIds)
+            ->whereKey($revenueId)
             ->update(['net_profit_percent' => $percent]);
-    }
-
-    protected function normalizeNetProfitPercent(object $row): ?string
-    {
-        $min = $row->min_net_profit_percent ?? null;
-        $max = $row->max_net_profit_percent ?? null;
-
-        if (! is_numeric($min) || ! is_numeric($max) || (float) $min !== (float) $max) {
-            return null;
-        }
-
-        return (string) (int) round((float) $min);
     }
 
     private function resolvePeriod(): AnalyticsPeriod

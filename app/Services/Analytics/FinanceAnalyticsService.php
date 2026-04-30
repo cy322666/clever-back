@@ -91,6 +91,50 @@ class FinanceAnalyticsService extends AnalyticsService
             ->orderByDesc('value')
             ->get();
 
+        $revenueRows = RevenueTransaction::query()
+            ->selectRaw("
+                revenue_transactions.id,
+                revenue_transactions.posted_at,
+                revenue_transactions.amount as value,
+                {$this->netProfitPercentSql()} as net_profit_percent,
+                {$netProfitSql} as net_value,
+                coalesce(
+                    nullif(trim(clients.name), ''),
+                    nullif(trim(bank_statement_rows.counterparty_name), ''),
+                    nullif(trim(revenue_transactions.note), ''),
+                    'Без клиента'
+                ) as counterparty,
+                coalesce(
+                    nullif(trim(bank_statement_rows.purpose), ''),
+                    nullif(trim(revenue_transactions.note), ''),
+                    nullif(trim(revenue_transactions.source_reference), ''),
+                    'Поступление'
+                ) as payment_label,
+                sum(revenue_transactions.amount) over (
+                    partition by coalesce(
+                        nullif(trim(clients.name), ''),
+                        nullif(trim(bank_statement_rows.counterparty_name), ''),
+                        nullif(trim(revenue_transactions.note), ''),
+                        'Без клиента'
+                    )
+                ) as counterparty_value,
+                sum({$netProfitSql}) over (
+                    partition by coalesce(
+                        nullif(trim(clients.name), ''),
+                        nullif(trim(bank_statement_rows.counterparty_name), ''),
+                        nullif(trim(revenue_transactions.note), ''),
+                        'Без клиента'
+                    )
+                ) as counterparty_net_value
+            ")
+            ->leftJoin('clients', 'clients.id', '=', 'revenue_transactions.client_id')
+            ->leftJoin('bank_statement_rows', 'bank_statement_rows.id', '=', 'revenue_transactions.bank_statement_row_id')
+            ->whereBetween('posted_at', [$period->from, $period->to])
+            ->orderByDesc('counterparty_value')
+            ->orderByDesc('posted_at')
+            ->orderByDesc('revenue_transactions.id')
+            ->get();
+
         $lowMarginClients = Client::query()
             ->where('margin_target', '<', config('dashboard.thresholds.low_margin_threshold'))
             ->limit(8)
@@ -109,6 +153,7 @@ class FinanceAnalyticsService extends AnalyticsService
                 'revenue_channels' => $this->namedSeries($revenueCats),
             ],
             'top_clients' => $clientsByRevenue,
+            'revenue_transactions' => $revenueRows,
             'low_margin_clients' => $lowMarginClients,
             'period' => $period,
         ];
