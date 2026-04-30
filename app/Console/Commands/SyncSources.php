@@ -42,7 +42,7 @@ class SyncSources extends Command
                     $log = $service->syncConnection($connection);
                     $results[] = ['connection' => $connection, 'log' => $log];
 
-                    $this->line(sprintf(
+                    $line = sprintf(
                         '[%s] %s -> %s (pulled: %d, created: %d, updated: %d, errors: %d)',
                         $connection->source_key,
                         $connection->name,
@@ -51,11 +51,13 @@ class SyncSources extends Command
                         $log->created_count,
                         $log->updated_count,
                         $log->error_count
-                    ));
+                    );
 
                     if ($log->error_count > 0 && filled($log->error_message)) {
-                        $this->warn('  Error: '.$log->error_message);
+                        $line .= ' error: '.$log->error_message;
                     }
+
+                    $log->error_count > 0 ? $this->warn($line) : $this->line($line);
                 }
 
                 $successCount = collect($results)->filter(fn ($result) => $result['log']->error_count === 0)->count();
@@ -78,7 +80,7 @@ class SyncSources extends Command
 
             $this->info("Syncing {$connection->source_key} ({$connection->name})...");
             $log = $service->syncConnection($connection);
-            $this->line(sprintf(
+            $line = sprintf(
                 '[%s] %s -> %s (pulled: %d, created: %d, updated: %d, errors: %d)',
                 $connection->source_key,
                 $connection->name,
@@ -87,11 +89,13 @@ class SyncSources extends Command
                 $log->created_count,
                 $log->updated_count,
                 $log->error_count
-            ));
+            );
 
             if ($log->error_count > 0 && filled($log->error_message)) {
-                $this->warn('  Error: '.$log->error_message);
+                $line .= ' error: '.$log->error_message;
             }
+
+            $log->error_count > 0 ? $this->warn($line) : $this->line($line);
 
             return self::SUCCESS;
         } catch (Throwable $throwable) {
