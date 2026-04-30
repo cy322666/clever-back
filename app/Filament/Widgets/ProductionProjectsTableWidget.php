@@ -129,7 +129,6 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
                     return $value;
                 }),
             TextColumn::make('hours_progress')->label('Факт / план')->sortable(),
-            TextColumn::make('hours')->label('Часы факт')->formatStateUsing(fn ($state) => number_format((float) round((float) $state), 0, ',', ' ') . ' ч')->sortable(),
             TextInputColumn::make('planned_hours_total')
                 ->label('План')
                 ->type('number')
