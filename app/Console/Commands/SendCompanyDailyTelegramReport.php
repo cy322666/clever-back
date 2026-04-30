@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\ExpenseTransaction;
+use App\Models\Employee;
 use App\Models\Project;
 use App\Models\RevenueTransaction;
 use App\Models\TaskTimeEntry;
@@ -197,8 +198,9 @@ class SendCompanyDailyTelegramReport extends Command
      */
     protected function employeeHours(AnalyticsPeriod $period): array
     {
-        return TaskTimeEntry::query()
+        $rows = TaskTimeEntry::query()
             ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as name")
+            ->selectRaw("coalesce(employees.id::text, mapped_employees.id::text, task_time_entries.employee_id::text, 'unassigned') as employee_key")
             ->selectRaw('sum(task_time_entries.minutes) / 60.0 as hours')
             ->leftJoin('employees', function ($join) {
                 $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
@@ -212,10 +214,39 @@ class SendCompanyDailyTelegramReport extends Command
             ->orderByDesc('hours')
             ->get()
             ->map(fn (object $row): array => [
+                'employee_key' => (string) $row->employee_key,
                 'name' => (string) $row->name,
                 'hours' => round((float) $row->hours, 1),
             ])
-            ->filter(fn (array $row): bool => (float) $row['hours'] > 0)
+            ->keyBy('employee_key');
+
+        Employee::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->each(function (Employee $employee) use ($rows): void {
+                $key = (string) $employee->id;
+
+                if ($rows->has($key)) {
+                    return;
+                }
+
+                $rows->put($key, [
+                    'employee_key' => $key,
+                    'name' => (string) $employee->name,
+                    'hours' => 0.0,
+                ]);
+            });
+
+        return $rows
+            ->sortBy([
+                ['hours', 'desc'],
+                ['name', 'asc'],
+            ])
+            ->map(fn (array $row): array => [
+                'name' => (string) $row['name'],
+                'hours' => (float) $row['hours'],
+            ])
             ->values()
             ->all();
     }
