@@ -7,7 +7,8 @@ if [ -d /opt/vendor ] && { [ "$APP_ENV" = "production" ] || [ ! -f /var/www/html
     cp -R /opt/vendor/. /var/www/html/vendor/
 fi
 
-if [ ! -f /var/www/html/public/build/manifest.json ] && [ -d /opt/build ]; then
+if [ -d /opt/build ] && { [ "$APP_ENV" = "production" ] || [ ! -f /var/www/html/public/build/manifest.json ]; }; then
+    rm -rf /var/www/html/public/build
     mkdir -p /var/www/html/public/build
     cp -R /opt/build/. /var/www/html/public/build/
 fi

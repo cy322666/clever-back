@@ -32,6 +32,7 @@ COPY --from=composer:2.8 /usr/bin/composer /usr/bin/composer
 COPY . .
 COPY --from=vendor /app/vendor /var/www/html/vendor
 COPY --from=vendor /app/vendor /opt/vendor
+COPY --from=assets /app/public/build /var/www/html/public/build
 COPY --from=assets /app/public/build /opt/build
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
