@@ -61,10 +61,26 @@ class FinanceAnalyticsService extends AnalyticsService
             ->get();
 
         $clientsByRevenue = RevenueTransaction::query()
-            ->selectRaw('clients.name as label, sum(revenue_transactions.amount) as value')
-            ->join('clients', 'clients.id', '=', 'revenue_transactions.client_id')
+            ->selectRaw("
+                coalesce(
+                    nullif(trim(clients.name), ''),
+                    nullif(trim(bank_statement_rows.counterparty_name), ''),
+                    nullif(trim(revenue_transactions.note), ''),
+                    'Без клиента'
+                ) as label,
+                sum(revenue_transactions.amount) as value
+            ")
+            ->leftJoin('clients', 'clients.id', '=', 'revenue_transactions.client_id')
+            ->leftJoin('bank_statement_rows', 'bank_statement_rows.id', '=', 'revenue_transactions.bank_statement_row_id')
             ->whereBetween('posted_at', [$period->from, $period->to])
-            ->groupBy('clients.name')
+            ->groupByRaw("
+                coalesce(
+                    nullif(trim(clients.name), ''),
+                    nullif(trim(bank_statement_rows.counterparty_name), ''),
+                    nullif(trim(revenue_transactions.note), ''),
+                    'Без клиента'
+                )
+            ")
             ->orderByDesc('value')
             ->get();
 
