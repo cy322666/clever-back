@@ -132,6 +132,9 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
             TextInputColumn::make('planned_hours_total')
                 ->label('План')
                 ->type('number')
+                ->width('5rem')
+                ->extraAttributes(['style' => 'width: 5rem; min-width: 5rem; max-width: 5rem;'])
+                ->extraInputAttributes(['style' => 'width: 5rem; min-width: 0;'])
                 ->updateStateUsing(function ($state, array $record): ?float {
                     $value = is_numeric($state) ? (float) $state : null;
                     $this->updateProject((int) $record['project_id'], [
