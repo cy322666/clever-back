@@ -64,6 +64,7 @@ class ProductionAnalyticsService extends AnalyticsService
 
         $dayAxis = $this->dayAxis($period);
         $timeRows = $this->timeEntryRows($period);
+        $projectTimeRows = $this->timeEntryRows(AnalyticsPeriod::preset('all'));
         $employees = $this->mergeTimeEntryEmployees($employees, $timeRows);
         $employeeCostMap = $employees->mapWithKeys(function (object $employee) {
             return [(string) $employee->id => $this->employeeHourlyCost($employee)];
@@ -84,9 +85,10 @@ class ProductionAnalyticsService extends AnalyticsService
             ->where('is_active', true)
             ->whereNotNull('salary_amount')
             ->sum('salary_amount');
-        $fallbackHourlyCost = $totalTimeHours > 0 ? $salaryPayrollCost / $totalTimeHours : 0;
+        $projectTotalTimeHours = (float) $projectTimeRows->sum('hours');
+        $projectFallbackHourlyCost = $projectTotalTimeHours > 0 ? $salaryPayrollCost / $projectTotalTimeHours : 0;
         $previousFallbackHourlyCost = $previousTotalTimeHours > 0 ? $salaryPayrollCost / $previousTotalTimeHours : 0;
-        $projectLoad = $this->projectLoadMatrix($allProjects, $timeRows, $hourRate, $employeeCostMap, $fallbackHourlyCost);
+        $projectLoad = $this->projectLoadMatrix($allProjects, $projectTimeRows, $hourRate, $employeeCostMap, $projectFallbackHourlyCost);
         $previousProjectLoad = $this->projectLoadMatrix($allProjects, $previousTimeRows, $hourRate, $employeeCostMap, $previousFallbackHourlyCost);
         $topProjects = $projectLoad->sortByDesc('hours')->values();
         $activeProjectLoad = $projectLoad->where('project_status', 'active')->values();
