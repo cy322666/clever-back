@@ -1,0 +1,12 @@
+/vendor
+/node_modules
+/.idea
+/.DS_Store
+/.env
+/storage/*.key
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/public/build
+/bootstrap/cache/*.php

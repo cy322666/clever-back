@@ -1,0 +1,61 @@
+services:
+  app:
+    build:
+      context: .
+      target: app
+    image: owner-analytics-app
+    working_dir: /var/www/html
+    command: sh -lc "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - postgres
+
+  scheduler:
+    image: owner-analytics-app
+    build:
+      context: .
+      target: app
+    working_dir: /var/www/html
+    command: sh -lc "php artisan schedule:work"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: local
+      DB_HOST: postgres
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: owner_analytics
+      POSTGRES_USER: owner
+      POSTGRES_PASSWORD: owner
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  node:
+    image: node:20-alpine
+    working_dir: /var/www/html
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "5173:5173"
+    profiles:
+      - dev
+
+volumes:
+  pgdata:
