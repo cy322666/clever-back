@@ -31,7 +31,7 @@ class AmoCrmConnector
         return in_array($driver, ['amo', 'amocrm'], true);
     }
 
-    public function getProduct(string|int $productId): ?array
+    public function getProduct(string|int $productId, ?array $settings = null): ?array
     {
         $cacheKey = (string) $productId;
 
@@ -39,14 +39,9 @@ class AmoCrmConnector
             return $this->catalogElementCache[$cacheKey];
         }
 
-        $response = Http::withToken(config('services.amo.access_token'))
-            ->acceptJson()
-            ->timeout(15)
-            ->get("https://blacklever.amocrm.ru/api/v4/catalogs/5655/elements/".$productId);
+        $products = $this->getProducts([$productId], $settings ?? config('services.amo', []));
 
-        $response->throw();
-
-        return $this->catalogElementCache[$cacheKey] = $response->json();
+        return $this->catalogElementCache[$cacheKey] = ($products[$cacheKey] ?? null);
     }
 
     /**
@@ -199,12 +194,22 @@ class AmoCrmConnector
             }
         }
 
-        $products = EntityProduct::query()->get();
+        $products = EntityProduct::query()
+            ->where(function ($query) {
+                $query
+                    ->whereNull('product_name')
+                    ->orWhere('product_name', '')
+                    ->orWhereNull('category')
+                    ->orWhereNull('total_amount')
+                    ->orWhere('total_amount', '<=', 0);
+            })
+            ->get();
+        $productDetails = $this->getProducts($products->pluck('external_id')->filter()->unique()->all(), $settings);
 
         foreach ($products as $productModel) {
 
             try {
-                $product = $this->getProduct($productModel->external_id);
+                $product = $productDetails[(string) $productModel->external_id] ?? null;
 
                 if (! is_array($product)) {
                     continue;
@@ -408,6 +413,70 @@ class AmoCrmConnector
     protected function filledSettings(array $settings): array
     {
         return array_filter($settings, fn ($value): bool => filled($value));
+    }
+
+    /**
+     * @param  array<int, string|int>  $productIds
+     * @return array<string, array<string, mixed>>
+     */
+    protected function getProducts(array $productIds, array $settings): array
+    {
+        $ids = collect($productIds)
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+
+        if ($baseUrl === '' || $token === '') {
+            return [];
+        }
+
+        $products = [];
+
+        foreach ($ids->chunk(100) as $chunk) {
+            try {
+                $response = Http::withToken($token)
+                    ->acceptJson()
+                    ->connectTimeout(5)
+                    ->timeout(20)
+                    ->get($baseUrl.'/api/v4/catalogs/5655/elements', [
+                        'filter' => [
+                            'id' => $chunk->values()->all(),
+                        ],
+                        'limit' => $chunk->count(),
+                    ]);
+
+                $response->throw();
+
+                $elements = data_get($response->json(), '_embedded.elements', []);
+
+                if (! is_array($elements)) {
+                    continue;
+                }
+
+                foreach ($elements as $element) {
+                    $id = (string) data_get($element, 'id', '');
+
+                    if ($id === '') {
+                        continue;
+                    }
+
+                    $products[$id] = $element;
+                    $this->catalogElementCache[$id] = $element;
+                }
+            } catch (Throwable $throwable) {
+                report($throwable);
+            }
+        }
+
+        return $products;
     }
 
     /**
