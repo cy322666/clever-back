@@ -121,16 +121,22 @@ class WeeekConnector
                         $externalUserId = (string) $taskWorkload->userId;
                         $employeeName = $this->resolveEmployeeName((array) $task, (array) $taskWorkload, $externalUserId, $memberNames);
                         $memberEmail = $memberEmails[$externalUserId] ?? null;
-                        $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName, $memberEmail);
+                        $employeeId = $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName, $memberEmail);
 
                         TaskTimeEntry::query()
                             ->updateOrCreate([
                                 'external_id' => $taskWorkload->id
                             ], [
                                 'task_id' => $task->id,
-                                'employee_id' => $taskWorkload->userId,
+                                'employee_id' => $employeeId,
                                 'entry_date' => $taskWorkload->date,
                                 'minutes' => $taskWorkload->duration,
+                                'metadata' => [
+                                    'weeek' => [
+                                        'user_id' => $externalUserId,
+                                        'workload' => $taskWorkload,
+                                    ],
+                                ],
                             ]);
                     }
                 }
@@ -219,7 +225,7 @@ class WeeekConnector
             $minutes = $this->taskEntryMinutes($entry);
             $externalUserId = (string) data_get($entry, 'userId', '');
             $employeeName = $this->resolveEmployeeName($payload, $entry, $externalUserId, $memberNames);
-                        $employeeId = $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName);
+            $employeeId = $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName);
 
             TaskTimeEntry::query()->updateOrCreate(
                 [
@@ -261,7 +267,7 @@ class WeeekConnector
         return 0;
     }
 
-    protected function resolveEmployeeId(SourceConnection $connection, string $externalUserId, object $task, ?string $displayName = null, ?string $memberEmail = null): ?string
+    protected function resolveEmployeeId(SourceConnection $connection, string $externalUserId, object $task, ?string $displayName = null, ?string $memberEmail = null): ?int
     {
         if ($externalUserId === '') {
             return null;
@@ -293,7 +299,7 @@ class WeeekConnector
                 ]
             );
 
-            return $externalUserId;
+            return $employee->id;
         }
 
         $candidateQuery = Employee::query();
@@ -330,7 +336,7 @@ class WeeekConnector
                 ]
             );
 
-            return $externalUserId;
+            return $existingEmployee->id;
         }
 
         $mapping = SourceMapping::query()
@@ -356,7 +362,7 @@ class WeeekConnector
                         $employee->save();
                     }
 
-                    return $externalUserId;
+                    return $employee->id;
                 }
 
                 if (filled($displayName)) {
@@ -374,7 +380,7 @@ class WeeekConnector
                         $mapping->label = $existingEmployee->name;
                         $mapping->save();
 
-                        return $externalUserId;
+                        return $existingEmployee->id;
                     }
                 }
 
@@ -405,10 +411,10 @@ class WeeekConnector
                     $mapping->label = $employee->name;
                     $mapping->save();
 
-                    return $externalUserId;
+                    return $employee->id;
                 }
 
-                return $externalUserId;
+                return null;
             }
 
         if (filled($displayName)) {
@@ -438,7 +444,7 @@ class WeeekConnector
                     ]
                 );
 
-                return $externalUserId;
+                return $employee->id;
             }
         }
 
@@ -482,7 +488,7 @@ class WeeekConnector
             ]
         );
 
-        return $externalUserId;
+        return $employee->id;
     }
 
     protected function resolveEmployeeName(array $taskPayload, array $entry, string $externalUserId, array $memberNames = []): ?string
