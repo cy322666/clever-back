@@ -94,9 +94,18 @@ class ProjectLimitMonitorService
      */
     public function projectRows(): Collection
     {
+        $today = CarbonImmutable::now()->toDateString();
+
         $projects = Project::query()
             ->with(['client', 'supportContract'])
             ->where('status', 'active')
+            ->whereNotNull('start_date')
+            ->whereDate('start_date', '<=', $today)
+            ->where(function ($query) use ($today) {
+                $query
+                    ->whereNull('due_date')
+                    ->orWhereDate('due_date', '>=', $today);
+            })
             ->orderBy('name')
             ->get();
 
