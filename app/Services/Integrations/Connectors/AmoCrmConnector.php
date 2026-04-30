@@ -66,8 +66,10 @@ class AmoCrmConnector
             ->map(fn ($value): string => (string) $value)
             ->values()
             ->all();
+        $warnings = [];
 
         foreach ($pipelineIds as $pipelineId) {
+            try {
 
             $leadQuery = $amoApi->leads()->filter([
                 'pipeline_id' => $pipelineId,
@@ -118,10 +120,20 @@ class AmoCrmConnector
                     );
                 }
             }
+            } catch (Throwable $throwable) {
+                report($throwable);
+                $warnings[] = 'Leads pipeline '.$pipelineId.': '.$throwable->getMessage();
+            }
         }
 
-        $customers = $amoApi->customers()
-            ->get(['catalog_elements', 'companies']);
+        try {
+            $customers = $amoApi->customers()
+                ->get(['catalog_elements', 'companies']);
+        } catch (Throwable $throwable) {
+            report($throwable);
+            $warnings[] = 'Customers: '.$throwable->getMessage();
+            $customers = [];
+        }
 
         foreach ($customers as $customer) {
             $client = null;
@@ -167,22 +179,31 @@ class AmoCrmConnector
 
         foreach ($companies as $companyModel) {
 
-            $company = $amoApi->companies()->find($companyModel->external_id);
+            try {
+                $company = $amoApi->companies()->find($companyModel->external_id);
 
-            $companyModel->name = $company->name;
-            $companyModel->metadata = array_merge($companyModel->metadata ?? [], [
-                'amo_company' => method_exists($company, 'toArray') ? $company->toArray() : [],
-            ]);
-            $companyModel->save();
+                $companyModel->name = $company->name;
+                $companyModel->metadata = array_merge($companyModel->metadata ?? [], [
+                    'amo_company' => method_exists($company, 'toArray') ? $company->toArray() : [],
+                ]);
+                $companyModel->save();
+            } catch (Throwable $throwable) {
+                report($throwable);
+                $warnings[] = 'Company '.$companyModel->external_id.': '.$throwable->getMessage();
+            }
         }
 
         $products = EntityProduct::query()->get();
 
         foreach ($products as $productModel) {
 
-            $product = $this->getProduct($productModel->external_id);
-
             try {
+                $product = $this->getProduct($productModel->external_id);
+
+                if (! is_array($product)) {
+                    continue;
+                }
+
                 $productModel->forceFill([
                     'product_name' => $product['name'] ?? $productModel->product_name,
                     'total_amount' => $this->getAmoFieldValueByName($product, 'Цена', $productModel->total_amount),
@@ -193,17 +214,24 @@ class AmoCrmConnector
                 $productModel->save();
             } catch (\Throwable $e) {
                 report($e);
+                $warnings[] = 'Product '.$productModel->external_id.': '.$e->getMessage();
 
             }
         }
 
-        $invoiceStats = $this->syncInvoices($amoApi, $connection, $settings);
+        try {
+            $invoiceStats = $this->syncInvoices($amoApi, $connection, $settings);
+        } catch (Throwable $throwable) {
+            report($throwable);
+            $warnings[] = 'Invoices: '.$throwable->getMessage();
+            $invoiceStats = ['pulled' => 0, 'created' => 0, 'updated' => 0];
+        }
 
         return SyncResult::ok(
             $invoiceStats['pulled'] ?? 0,
             $invoiceStats['created'] ?? 0,
             $invoiceStats['updated'] ?? 0,
-            ['invoices' => $invoiceStats]
+            ['invoices' => $invoiceStats, 'warnings' => $warnings]
         );
     }
 

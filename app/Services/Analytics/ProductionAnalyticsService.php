@@ -234,7 +234,7 @@ class ProductionAnalyticsService extends AnalyticsService
             ->leftJoin('employees', function ($join) {
                 $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
             })
-            ->leftJoin('tasks', 'tasks.external_id', '=', DB::raw('task_time_entries.task_id::text'))
+            ->leftJoin('tasks', 'tasks.id', '=', 'task_time_entries.task_id')
             ->leftJoin('projects as task_projects_by_id', 'task_projects_by_id.id', '=', 'tasks.project_id')
             ->leftJoin('projects as task_projects_by_external', function ($join) {
                 $join->whereRaw('task_projects_by_external.external_id = tasks.project_id::text');

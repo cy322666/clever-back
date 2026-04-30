@@ -102,9 +102,7 @@ class ProjectLimitMonitorService
 
         $timeRows = TaskTimeEntry::query()
             ->selectRaw('tasks.project_id as project_id, task_time_entries.entry_date::date as date, sum(task_time_entries.minutes) / 60.0 as hours')
-            ->join('tasks', function ($join) {
-                $join->whereRaw('tasks.external_id = task_time_entries.task_id::text');
-            })
+            ->join('tasks', 'tasks.id', '=', 'task_time_entries.task_id')
             ->groupByRaw('tasks.project_id, task_time_entries.entry_date::date')
             ->get()
             ->groupBy('project_id');

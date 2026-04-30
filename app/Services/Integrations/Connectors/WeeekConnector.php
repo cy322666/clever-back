@@ -121,14 +121,14 @@ class WeeekConnector
                         $externalUserId = (string) $taskWorkload->userId;
                         $employeeName = $this->resolveEmployeeName((array) $task, (array) $taskWorkload, $externalUserId, $memberNames);
                         $memberEmail = $memberEmails[$externalUserId] ?? null;
-                        $employeeId = $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName, $memberEmail);
+                        $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName, $memberEmail);
 
                         TaskTimeEntry::query()
                             ->updateOrCreate([
                                 'external_id' => $taskWorkload->id
                             ], [
                                 'task_id' => $taskModel->id,
-                                'employee_id' => $employeeId,
+                                'employee_id' => $externalUserId !== '' ? $externalUserId : null,
                                 'entry_date' => $taskWorkload->date,
                                 'minutes' => $taskWorkload->duration,
                                 'metadata' => [
@@ -225,7 +225,7 @@ class WeeekConnector
             $minutes = $this->taskEntryMinutes($entry);
             $externalUserId = (string) data_get($entry, 'userId', '');
             $employeeName = $this->resolveEmployeeName($payload, $entry, $externalUserId, $memberNames);
-            $employeeId = $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName);
+            $this->resolveEmployeeId($connection, $externalUserId, $task, $employeeName);
 
             TaskTimeEntry::query()->updateOrCreate(
                 [
@@ -233,7 +233,7 @@ class WeeekConnector
                 ],
                 [
                     'task_id' => $task->id,
-                    'employee_id' => $employeeId,
+                    'employee_id' => $externalUserId !== '' ? $externalUserId : null,
                     'entry_date' => $this->toDate(data_get($entry, 'date'))?->toDateString() ?? now()->toDateString(),
                     'minutes' => $minutes,
                     'cost' => round(($minutes / 60) * $hourRate, 2),
