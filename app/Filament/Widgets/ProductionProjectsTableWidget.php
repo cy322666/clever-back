@@ -128,7 +128,6 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
 
                     return $value;
                 }),
-            TextColumn::make('hours_progress')->label('Факт / план')->sortable(),
             TextInputColumn::make('planned_hours_total')
                 ->label('План')
                 ->type('number')

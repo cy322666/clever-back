@@ -158,6 +158,7 @@ class ProductionAnalyticsService extends AnalyticsService
 
         return [
             'kpis' => [
+                ['label' => 'Часы факт', 'value' => number_format($totalFactHours, 1, ',', ' '), 'hint' => 'По time entries', 'tone' => 'cyan', 'comparison' => $this->compareValues($totalFactHours, $previousTotalFactHours)],
                 ['label' => 'Стоимость часов', 'value' => number_format($totalEarned, 0, ',', ' ') . ' ₽', 'hint' => $this->moneyRateLabel($hourRate), 'tone' => 'emerald', 'comparison' => $this->compareValues($totalEarned, $previousTotalEarned)],
                 ['label' => 'ФОТ', 'value' => number_format($totalPayrollCost, 0, ',', ' ') . ' ₽', 'tone' => 'amber', 'comparison' => $this->compareValues($totalPayrollCost, $previousTotalPayrollCost), 'description' => ''],
                 ['label' => 'Маржа собственника', 'value' => number_format($totalOwnerProfit, 0, ',', ' ') . ' ₽', 'hint' => 'Часы × 3000 - зарплата', 'tone' => 'cyan', 'comparison' => $this->compareValues($totalOwnerProfit, $previousTotalOwnerProfit)],
