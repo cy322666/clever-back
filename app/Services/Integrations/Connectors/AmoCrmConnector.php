@@ -33,6 +33,12 @@ class AmoCrmConnector
 
     public function getProduct(string|int $productId): ?array
     {
+        $cacheKey = (string) $productId;
+
+        if (array_key_exists($cacheKey, $this->catalogElementCache)) {
+            return $this->catalogElementCache[$cacheKey];
+        }
+
         $response = Http::withToken(config('services.amo.access_token'))
             ->acceptJson()
             ->timeout(15)
@@ -40,7 +46,7 @@ class AmoCrmConnector
 
         $response->throw();
 
-        return $response->json();
+        return $this->catalogElementCache[$cacheKey] = $response->json();
     }
 
     /**
