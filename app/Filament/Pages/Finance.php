@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\FinanceLowMarginClientsTableWidget;
 use App\Filament\Widgets\FinanceStatsOverviewWidget;
 use App\Filament\Widgets\FinanceTopClientsTableWidget;
 use Filament\Support\Icons\Heroicon;
@@ -18,7 +17,6 @@ class Finance extends AnalyticsPage
         return [
             $this->widget(FinanceStatsOverviewWidget::class, withPeriod: true),
             $this->widget(FinanceTopClientsTableWidget::class, withPeriod: true),
-            $this->widget(FinanceLowMarginClientsTableWidget::class, withPeriod: true),
         ];
     }
 }
