@@ -28,7 +28,8 @@ return [
         'sync_window_days' => env('TOCHKA_SYNC_WINDOW_DAYS', env('INTEGRATION_DEFAULT_SYNC_WINDOW_DAYS', 30)),
         'poll_attempts' => env('TOCHKA_POLL_ATTEMPTS', 6),
         'poll_seconds' => env('TOCHKA_POLL_SECONDS', 2),
-        'timeout' => env('TOCHKA_TIMEOUT', 30),
+        'connect_timeout' => env('TOCHKA_CONNECT_TIMEOUT', 15),
+        'timeout' => env('TOCHKA_TIMEOUT', 60),
     ],
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),

@@ -36,7 +36,26 @@ class WeeekConnector
             return SyncResult::fail('Weeek is not configured: WEEEK_TOKEN is required');
         }
 
-        return $this->syncWithSettings($connection, $settings);
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return $this->syncWithSettings($connection, $settings);
+            } catch (Throwable $throwable) {
+                $lastError = $throwable;
+
+                if (! $this->isRetryableTransportError($throwable) || $attempt === 3) {
+                    break;
+                }
+
+                sleep($attempt * 2);
+            }
+        }
+
+        return SyncResult::fail(
+            'Weeek API временно недоступен: '.$lastError?->getMessage(),
+            payload: ['attempts' => 3],
+        );
     }
 
     /**
@@ -53,20 +72,26 @@ class WeeekConnector
         $pulled = 0;
         $created = 0;
         $updated = 0;
+        $warnings = [];
 
         if ($weeekApi !== null) {
-            foreach (($weeekApi->workspace->members()->members ?? []) as $member) {
-                $memberId = (string) data_get($member, 'id', '');
-                $memberName = trim((string) data_get($member, 'name', data_get($member, 'fullName', data_get($member, 'full_name', ''))));
-                $memberEmail = trim((string) data_get($member, 'email', ''));
+            try {
+                foreach (($weeekApi->workspace->members()->members ?? []) as $member) {
+                    $memberId = (string) data_get($member, 'id', '');
+                    $memberName = trim((string) data_get($member, 'name', data_get($member, 'fullName', data_get($member, 'full_name', ''))));
+                    $memberEmail = trim((string) data_get($member, 'email', ''));
 
-                if ($memberId !== '' && $memberName !== '') {
-                    $memberNames[$memberId] = $memberName;
-                }
+                    if ($memberId !== '' && $memberName !== '') {
+                        $memberNames[$memberId] = $memberName;
+                    }
 
-                if ($memberId !== '' && $memberEmail !== '') {
-                    $memberEmails[$memberId] = $memberEmail;
+                    if ($memberId !== '' && $memberEmail !== '') {
+                        $memberEmails[$memberId] = $memberEmail;
+                    }
                 }
+            } catch (Throwable $throwable) {
+                report($throwable);
+                $warnings[] = 'Members: '.$throwable->getMessage();
             }
         }
 
@@ -157,7 +182,17 @@ class WeeekConnector
 
         app(ProjectLimitMonitorService::class)->refresh();
 
-        return SyncResult::ok($pulled, $created, $updated, message: 'Weeek synchronized');
+        return SyncResult::ok($pulled, $created, $updated, ['warnings' => $warnings], 'Weeek synchronized');
+    }
+
+    protected function isRetryableTransportError(Throwable $throwable): bool
+    {
+        $message = $throwable->getMessage();
+
+        return $throwable instanceof TransportException
+            || str_contains($message, 'cURL error')
+            || str_contains($message, 'SSL_ERROR_SYSCALL')
+            || str_contains($message, 'Connection timed out');
     }
 
     /**

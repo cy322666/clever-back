@@ -16,6 +16,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Throwable;
 
 class TochkaBankConnector implements SourceConnector
 {
@@ -37,7 +38,13 @@ class TochkaBankConnector implements SourceConnector
             ->startOfDay();
         $to = CarbonImmutable::now()->endOfDay();
 
-        $statement = $this->fetchStatement($settings, $from, $to);
+        try {
+            $statement = $this->fetchStatement($settings, $from, $to);
+        } catch (Throwable $throwable) {
+            report($throwable);
+
+            return SyncResult::fail($this->tochkaErrorMessage($throwable));
+        }
 
         if (Str::lower((string) ($statement['status'] ?? '')) !== 'ready') {
             return SyncResult::fail(
@@ -303,7 +310,24 @@ class TochkaBankConnector implements SourceConnector
         return Http::withToken((string) $settings['token'])
             ->acceptJson()
             ->asJson()
-            ->timeout((int) ($settings['timeout'] ?? 30));
+            ->connectTimeout((int) ($settings['connect_timeout'] ?? 15))
+            ->timeout((int) ($settings['timeout'] ?? 60))
+            ->retry(3, 1000);
+    }
+
+    protected function tochkaErrorMessage(Throwable $throwable): string
+    {
+        $message = $throwable->getMessage();
+
+        if (str_contains($message, 'status code 403')) {
+            return 'Точка Банк вернула 403: токен виден, но нет доступа к выпискам по этому счету. Проверь права Open Banking/ReadStatements и TOCHKA_BANK_ACCOUNT.';
+        }
+
+        if (str_contains($message, 'cURL error')) {
+            return 'Точка Банк временно недоступна по сети: '.$message;
+        }
+
+        return $message;
     }
 
     protected function matchClient(string $counterparty): ?Client
