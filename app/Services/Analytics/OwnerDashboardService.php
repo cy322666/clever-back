@@ -95,7 +95,7 @@ class OwnerDashboardService extends AnalyticsService
 
         $employeeHoursRows = TaskTimeEntry::query()
             ->selectRaw("coalesce(task_time_entries.employee_id::text, 'unassigned') as employee_id")
-            ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), max(task_time_entries.employee_id::text), 'Без сотрудника') as label, sum(task_time_entries.minutes) / 60.0 as value, count(*) as entries")
+            ->selectRaw("coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as label, sum(task_time_entries.minutes) / 60.0 as value, count(*) as entries")
             ->leftJoin('employees', function ($join) {
                 $join->whereRaw('employees.weeek_uuid::text = task_time_entries.employee_id::text');
             })

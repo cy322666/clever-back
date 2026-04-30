@@ -227,7 +227,7 @@ class ProductionAnalyticsService extends AnalyticsService
             ->selectRaw("
                 task_time_entries.entry_date::date as date,
                 coalesce(employees.weeek_uuid::text, mapped_employees.weeek_uuid::text, task_time_entries.employee_id::text) as employee_id,
-                coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), max(task_time_entries.employee_id::text), 'Без сотрудника') as employee_name,
+                coalesce(max(employees.name), max(mapped_employees.name), max(employee_mappings.label), 'Без сотрудника') as employee_name,
                 coalesce(max(employees.capacity_hours_per_week), max(mapped_employees.capacity_hours_per_week), 40) as capacity_hours_per_week,
                 coalesce(max(employees.salary_amount), max(mapped_employees.salary_amount), 0) as salary_amount,
                 coalesce(max(employees.hourly_cost), max(mapped_employees.hourly_cost), 0) as hourly_cost,
