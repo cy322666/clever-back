@@ -55,12 +55,6 @@ class AmoCrmConnector
             return SyncResult::fail('amoCRM is not configured');
         }
 
-        $amoApi = $this->buildAmoClient($settings);
-
-        if (! $amoApi) {
-            return SyncResult::fail('Unable to build amoCRM client');
-        }
-
         $pipelineIds = Pipeline::query()
             ->pluck('external_id')
             ->filter()
@@ -71,52 +65,54 @@ class AmoCrmConnector
 
         foreach ($pipelineIds as $pipelineId) {
             try {
-
-            $leadQuery = $amoApi->leads()->filter([
-                'pipeline_id' => $pipelineId,
-                'created_at' => [
-                    'from' => CarbonImmutable::now()->startOfYear()->startOfDay()->timestamp,
-                    'to'   => CarbonImmutable::now()->endOfDay()->timestamp,
-                ]
-            ], ['catalog_elements', 'companies']);
-
-            $leads = $leadQuery->fetchAll();
+            $leads = $this->fetchAmoCollection($settings, '/api/v4/leads', [
+                'filter' => [
+                    'pipeline_id' => $pipelineId,
+                    'created_at' => [
+                        'from' => CarbonImmutable::now()->startOfYear()->startOfDay()->timestamp,
+                        'to' => CarbonImmutable::now()->endOfDay()->timestamp,
+                    ],
+                ],
+                'with' => 'catalog_elements,companies',
+            ], 'leads');
 
             foreach ($leads as $lead) {
                 $client = null;
+                $company = data_get($lead, '_embedded.companies.0');
 
-                if (count($lead->companies) > 0) {
-                    $client = $this->upsertAmoCompanyClient($lead->companies[0], $lead->name);
+                if ($company !== null) {
+                    $client = $this->upsertAmoCompanyClient($company, data_get($lead, 'name'));
                 }
 
                 SalesLead::query()->updateOrCreate(
                     [
-                        'external_id' => $lead->id,
+                        'external_id' => data_get($lead, 'id'),
                     ],
                     [
                         'client_id' => $client?->id,
-                        'name' => $lead->name,
-                        'source_channel' => $lead->cf('Источник')->getValue(),
-                        'status_id' => $lead->status_id,
-                        'budget_amount' => $lead->price,
-                        'lead_created_at' => Carbon::parse($lead->created_at)->toDateTimeString(),
-                        'lead_closed_at' => $lead->closed_at ? Carbon::parse($lead->closed_at)->toDateTimeString() : null,
-                        'last_activity_at' => Carbon::parse($lead->updated_at)->toDateTimeString(),
-                        'pipeline_id' => $lead->pipeline_id,
+                        'name' => data_get($lead, 'name'),
+                        'source_channel' => $this->leadSourceChannel($lead),
+                        'status_id' => data_get($lead, 'status_id'),
+                        'budget_amount' => data_get($lead, 'price', 0),
+                        'lead_created_at' => $this->toDateTime(data_get($lead, 'created_at'))?->toDateTimeString(),
+                        'lead_closed_at' => $this->toDateTime(data_get($lead, 'closed_at'))?->toDateTimeString(),
+                        'last_activity_at' => $this->toDateTime(data_get($lead, 'updated_at'))?->toDateTimeString(),
+                        'pipeline_id' => data_get($lead, 'pipeline_id'),
                         'metadata' => [
-                            'amo_lead' => $lead->toArray(),
+                            'amo_lead' => $lead,
                         ],
                     ]
                 );
 
-                if (!empty($lead->catalog_elements[0])) {
+                $catalogElement = data_get($lead, '_embedded.catalog_elements.0');
 
+                if (is_array($catalogElement)) {
                     EntityProduct::query()->updateOrCreate([
-                        'external_id' => $lead->catalog_elements[0]->id,
-                        'entity_external_id' => $lead->id,
+                        'external_id' => data_get($catalogElement, 'id'),
+                        'entity_external_id' => data_get($lead, 'id'),
                         'entity_type' => 'lead',
                     ], [
-                        'quantity' => $lead->catalog_elements[0]->metadata->quantity,
+                        'quantity' => data_get($catalogElement, 'metadata.quantity', 1),
                         ]
                     );
                 }
@@ -128,8 +124,9 @@ class AmoCrmConnector
         }
 
         try {
-            $customers = $amoApi->customers()
-                ->get(['catalog_elements', 'companies']);
+            $customers = $this->fetchAmoCollection($settings, '/api/v4/customers', [
+                'with' => 'catalog_elements,companies',
+            ], 'customers');
         } catch (Throwable $throwable) {
             report($throwable);
             $warnings[] = 'Customers: '.$throwable->getMessage();
@@ -138,36 +135,38 @@ class AmoCrmConnector
 
         foreach ($customers as $customer) {
             $client = null;
+            $company = data_get($customer, '_embedded.companies.0');
 
-            if (count($customer->companies) > 0) {
-                $client = $this->upsertAmoCompanyClient($customer->companies[0], $customer->name);
+            if ($company !== null) {
+                $client = $this->upsertAmoCompanyClient($company, data_get($customer, 'name'));
             }
 
             Buyer::query()->updateOrCreate([
-                'external_id' => $customer->id,
+                'external_id' => data_get($customer, 'id'),
             ], [
                 'client_id' => $client?->id,
-                'name' => $customer->name,
-                'status' => $customer->status_id,
-                'periodicity' => $customer->periodicity,
-                'purchases_count' => (float) ($customer->purchases_count ?? 0),
-                'average_check' => (float) ($customer->average_check ?? 0),
-                'ltv' => (float) ($customer->ltv ?? 0),
-                'next_price' => (float) ($customer->next_price ?? 0),
-                'next_date' => filled($customer->next_date) ? Carbon::parse($customer->next_date)->toDateTimeString() : null,
+                'name' => data_get($customer, 'name'),
+                'status' => data_get($customer, 'status_id'),
+                'periodicity' => data_get($customer, 'periodicity'),
+                'purchases_count' => (float) (data_get($customer, 'purchases_count') ?? 0),
+                'average_check' => (float) (data_get($customer, 'average_check') ?? 0),
+                'ltv' => (float) (data_get($customer, 'ltv') ?? 0),
+                'next_price' => (float) (data_get($customer, 'next_price') ?? 0),
+                'next_date' => $this->toDateTime(data_get($customer, 'next_date'))?->toDateTimeString(),
                 'metadata' => [
-                    'amo_customer' => $customer->toArray(),
+                    'amo_customer' => $customer,
                 ],
             ]);
 
-            if (!empty($customer->catalog_elements[0])) {
+            $catalogElement = data_get($customer, '_embedded.catalog_elements.0');
 
+            if (is_array($catalogElement)) {
                 EntityProduct::query()->updateOrCreate([
-                    'external_id' => $customer->catalog_elements[0]->id,
-                    'entity_external_id' => $customer->id,
+                    'external_id' => data_get($catalogElement, 'id'),
+                    'entity_external_id' => data_get($customer, 'id'),
                     'entity_type' => 'customer',
                 ], [
-                    'quantity' => $customer->catalog_elements[0]->metadata->quantity,
+                    'quantity' => data_get($catalogElement, 'metadata.quantity', 1),
                     ]
                 );
             }
@@ -181,11 +180,11 @@ class AmoCrmConnector
         foreach ($companies as $companyModel) {
 
             try {
-                $company = $amoApi->companies()->find($companyModel->external_id);
+                $company = $this->fetchAmoEntity($settings, '/api/v4/companies/'.$companyModel->external_id);
 
-                $companyModel->name = $company->name;
+                $companyModel->name = (string) data_get($company, 'name', $companyModel->name);
                 $companyModel->metadata = array_merge($companyModel->metadata ?? [], [
-                    'amo_company' => method_exists($company, 'toArray') ? $company->toArray() : [],
+                    'amo_company' => $company,
                 ]);
                 $companyModel->save();
             } catch (Throwable $throwable) {
@@ -234,6 +233,12 @@ class AmoCrmConnector
 
         if ((bool) ($settings['sync_invoices'] ?? false)) {
             try {
+                $amoApi = $this->buildAmoClient($settings);
+
+                if (! $amoApi) {
+                    throw new \RuntimeException('Unable to build amoCRM client');
+                }
+
                 $invoiceStats = $this->syncInvoices($amoApi, $connection, $settings);
             } catch (Throwable $throwable) {
                 report($throwable);
@@ -389,7 +394,7 @@ class AmoCrmConnector
         return filled($settings['base_url'] ?? null) && filled($settings['access_token'] ?? null);
     }
 
-    protected function upsertAmoCompanyClient(object $company, ?string $fallbackName = null): Client
+    protected function upsertAmoCompanyClient(mixed $company, ?string $fallbackName = null): Client
     {
         $externalId = (string) data_get($company, 'id', '');
         $name = trim((string) data_get($company, 'name', $fallbackName ?: 'amoCRM company '.$externalId));
@@ -404,10 +409,67 @@ class AmoCrmConnector
                 'category' => 'company',
                 'status' => 'active',
                 'metadata' => [
-                    'amo_company' => method_exists($company, 'toArray') ? $company->toArray() : [],
+                    'amo_company' => $this->normalizeAmoEntity($company),
                 ],
             ],
         );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function fetchAmoCollection(array $settings, string $path, array $query, string $embeddedKey): array
+    {
+        $items = [];
+        $page = 1;
+        $limit = 250;
+
+        do {
+            $payload = $this->fetchAmoEntity($settings, $path, array_merge($query, [
+                'page' => $page,
+                'limit' => $limit,
+            ]));
+
+            $batch = data_get($payload, '_embedded.'.$embeddedKey, []);
+
+            if (! is_array($batch) || $batch === []) {
+                break;
+            }
+
+            foreach ($batch as $item) {
+                if (is_array($item)) {
+                    $items[] = $item;
+                }
+            }
+
+            $hasNextPage = filled(data_get($payload, '_links.next.href'));
+            $page++;
+        } while ($hasNextPage && $page <= 100);
+
+        return $items;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function fetchAmoEntity(array $settings, string $path, array $query = []): array
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+
+        if ($baseUrl === '' || $token === '') {
+            throw new \RuntimeException('amoCRM is not configured');
+        }
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->get($baseUrl.$path, $query);
+
+        $response->throw();
+
+        return $response->json() ?? [];
     }
 
     protected function filledSettings(array $settings): array
@@ -686,7 +748,10 @@ class AmoCrmConnector
         }
 
         foreach ($fields as $field) {
-            if ((string) data_get($field, 'field_id') !== '431237') {
+            $fieldId = (string) data_get($field, 'field_id');
+            $fieldName = Str::lower(trim((string) data_get($field, 'field_name', '')));
+
+            if ($fieldId !== '431237' && $fieldName !== Str::lower('Источник')) {
                 continue;
             }
 
