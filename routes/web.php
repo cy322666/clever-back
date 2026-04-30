@@ -12,6 +12,9 @@ use App\Http\Controllers\RiskController;
 use App\Http\Controllers\SalesController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/livewire-{hash}/update', fn () => redirect('/admin/production'))
+    ->where('hash', '[A-Za-z0-9]+');
+
 Route::redirect('/', '/admin/sales');
 Route::redirect('/dashboard', '/admin/sales');
 Route::redirect('/sales', '/admin/sales');
