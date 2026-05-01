@@ -487,6 +487,87 @@ class AmoCrmConnector
     }
 
     /**
+     * @param  iterable<Client>  $clients
+     * @return array{pulled:int, created:int, updated:int, skipped:int, tagged:int, warnings:array<int, string>}
+     */
+    public function syncClientsToAmoByInn(SourceConnection $connection, iterable $clients, string $tagName = 'Точка', bool $dryRun = false): array
+    {
+        $settings = $this->resolveSettings($connection);
+
+        if (! $this->isConfigured($settings)) {
+            throw new \RuntimeException('amoCRM is not configured');
+        }
+
+        $stats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'tagged' => 0, 'warnings' => []];
+
+        foreach ($clients as $client) {
+            if (! $client instanceof Client) {
+                continue;
+            }
+
+            $stats['pulled']++;
+            $inn = $this->normalizeInn($client->inn);
+
+            if ($inn === null) {
+                $stats['skipped']++;
+                $stats['warnings'][] = 'Client '.$client->id.' skipped: no valid INN';
+                continue;
+            }
+
+            try {
+                $amoCompany = $this->findAmoCompanyByInn($settings, $inn);
+                $createdInAmo = false;
+
+                if (! $amoCompany) {
+                    if ($dryRun) {
+                        $stats['created']++;
+                        continue;
+                    }
+
+                    $amoCompany = $this->createAmoCompanyFromClient($settings, $client, $inn);
+                    $createdInAmo = true;
+                } elseif ($dryRun) {
+                    $stats['updated']++;
+                    continue;
+                }
+
+                $companyId = (string) data_get($amoCompany, 'id', '');
+
+                if ($companyId === '') {
+                    throw new \RuntimeException('amoCRM company id is empty for INN '.$inn);
+                }
+
+                if ($this->ensureAmoCompanyTag($settings, $companyId, $tagName)) {
+                    $stats['tagged']++;
+                }
+
+                $client->forceFill([
+                    'source_type' => 'amo_company',
+                    'external_id' => $companyId,
+                    'name' => trim((string) data_get($amoCompany, 'name', $client->name)) ?: $client->name,
+                    'legal_name' => $client->legal_name ?: $client->name,
+                    'inn' => $inn,
+                    'category' => 'company',
+                    'status' => 'active',
+                    'metadata' => array_merge(is_array($client->metadata) ? $client->metadata : [], [
+                        'amo_company' => $amoCompany,
+                        'amo_company_synced_at' => now()->toDateTimeString(),
+                        'amo_company_sync_tag' => $tagName,
+                    ]),
+                ]);
+                $client->save();
+
+                $createdInAmo ? $stats['created']++ : $stats['updated']++;
+            } catch (Throwable $throwable) {
+                report($throwable);
+                $stats['warnings'][] = 'Client '.$client->id.' INN '.$inn.': '.$throwable->getMessage();
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
      * @return array{pulled:int, created:int, updated:int, warnings:array<int, string>}
      */
     protected function syncLocalCompaniesToAmo(array $settings): array
@@ -628,6 +709,53 @@ class AmoCrmConnector
         }
 
         return $created;
+    }
+
+    protected function ensureAmoCompanyTag(array $settings, string $companyId, string $tagName): bool
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+        $tagName = trim($tagName);
+
+        if ($baseUrl === '' || $token === '' || $companyId === '' || $tagName === '') {
+            return false;
+        }
+
+        $company = $this->fetchAmoEntity($settings, '/api/v4/companies/'.$companyId, ['with' => 'tags']);
+        $tags = collect(data_get($company, '_embedded.tags', []))
+            ->filter(fn ($tag): bool => is_array($tag))
+            ->map(function (array $tag): array {
+                $id = (int) data_get($tag, 'id', 0);
+                $name = trim((string) data_get($tag, 'name', ''));
+
+                return array_filter([
+                    'id' => $id > 0 ? $id : null,
+                    'name' => $name !== '' ? $name : null,
+                ], fn ($value): bool => filled($value));
+            })
+            ->filter(fn (array $tag): bool => filled($tag['id'] ?? null) || filled($tag['name'] ?? null))
+            ->values();
+
+        if ($tags->contains(fn (array $tag): bool => Str::lower((string) ($tag['name'] ?? '')) === Str::lower($tagName))) {
+            return false;
+        }
+
+        $tags->push(['name' => $tagName]);
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->patch($baseUrl.'/api/v4/companies/'.$companyId, [
+                '_embedded' => [
+                    'tags' => $tags->values()->all(),
+                ],
+            ]);
+
+        $response->throw();
+
+        return true;
     }
 
     protected function companyInnFieldId(array $settings): ?int

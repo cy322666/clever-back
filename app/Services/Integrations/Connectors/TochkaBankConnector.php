@@ -128,6 +128,67 @@ class TochkaBankConnector implements SourceConnector
         );
     }
 
+    /**
+     * Pull counterparties from Tochka statements without changing finance rows.
+     *
+     * @return array{pulled:int, created:int, updated:int, skipped:int, clients:\Illuminate\Support\Collection<int, Client>, account_id:string, statement_id:mixed}
+     */
+    public function syncCounterparties(SourceConnection $connection, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $settings = $this->resolveSettings($connection);
+
+        if (! $this->isConfigured($settings)) {
+            throw new \RuntimeException('Точка Банк не настроен: нужен TOCHKA_TOKEN');
+        }
+
+        $account = $this->fetchPrimaryAccount($settings);
+        $accountId = $this->accountId($account);
+
+        if ($accountId === '') {
+            throw new \RuntimeException('Точка Банк не вернула accountId в списке счетов');
+        }
+
+        $statement = $this->fetchStatement($settings, $from, $to, $accountId);
+
+        if (Str::lower((string) ($statement['status'] ?? '')) !== 'ready') {
+            throw new \RuntimeException('Выписка Точки еще не готова: '.(string) ($statement['status'] ?? 'unknown'));
+        }
+
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $clients = collect();
+
+        foreach ($this->extractAllTransactions($statement) as $transaction) {
+            $normalized = $this->normalizeTransaction($transaction, $statement, $connection->source_key);
+
+            if (blank($normalized['counterparty_name'] ?? null) && blank($normalized['counterparty_inn'] ?? null)) {
+                $skipped++;
+                continue;
+            }
+
+            $client = $this->syncCounterpartyClient($normalized, $transaction);
+
+            if (! $client) {
+                $skipped++;
+                continue;
+            }
+
+            $client->wasRecentlyCreated ? $created++ : $updated++;
+            $clients->put((string) $client->id, $client);
+        }
+
+        return [
+            'pulled' => count($this->extractAllTransactions($statement)),
+            'created' => $created,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'clients' => $clients->values(),
+            'account_id' => $accountId,
+            'statement_id' => $statement['statementId'] ?? null,
+        ];
+    }
+
     protected function fetchStatement(array $settings, CarbonImmutable $from, CarbonImmutable $to, string $accountId): array
     {
         $baseUrl = rtrim((string) $settings['base_url'], '/');
@@ -276,13 +337,31 @@ class TochkaBankConnector implements SourceConnector
      */
     protected function extractTransactions(array $statement): array
     {
-        $transactions = $statement['Transaction'] ?? [];
-
-        $transactions = Arr::isAssoc($transactions) ? [$transactions] : array_values($transactions);
+        $transactions = $this->extractAllTransactions($statement);
 
         return array_values(array_filter($transactions, function (array $transaction): bool {
             return Str::lower((string) ($transaction['creditDebitIndicator'] ?? 'Credit')) === 'credit';
         }));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function extractAllTransactions(array $statement): array
+    {
+        $transactions = $statement['Transaction'] ?? [];
+
+        if ($transactions instanceof \Illuminate\Support\Collection) {
+            $transactions = $transactions->all();
+        }
+
+        if (! is_array($transactions)) {
+            return [];
+        }
+
+        $transactions = Arr::isAssoc($transactions) ? [$transactions] : array_values($transactions);
+
+        return array_values(array_filter($transactions, fn ($transaction): bool => is_array($transaction)));
     }
 
     /**
