@@ -256,15 +256,17 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             $rows->push($this->attentionRow('project', $project?->name ?: 'Проект #'.$overdue->project_id, 'Есть просрочки', $overdue->overdue_count.' задач', 'Разобрать просроченные задачи', $project?->manager?->name, 'high', Production::getUrl()));
         }
 
-        foreach ($this->clientEffectiveRateRows($period) as $clientRow) {
-            if (($clientRow['rate'] ?? 0) <= 0) {
-                continue;
+        foreach (app(EffectiveRateAnalyticsService::class)->build($period)['rows'] ?? [] as $rateRow) {
+            $rate = $rateRow['rate'] ?? null;
+
+            if ($rate !== null && (float) $rate < 2000) {
+                $rows->push($this->attentionRow('client', (string) $rateRow['client'], 'Низкая фактическая ставка', (string) $rateRow['rate_label'], 'Поднять тариф, выставить доп. счёт или сократить объём', (string) ($rateRow['manager'] ?? 'Не назначен'), 'high', Finance::getUrl()));
+            } elseif ($rate !== null && (float) $rate < $hourRate) {
+                $rows->push($this->attentionRow('client', (string) $rateRow['client'], 'Низкая фактическая ставка', (string) $rateRow['rate_label'], 'Проверить экономику клиента и условия оплаты', (string) ($rateRow['manager'] ?? 'Не назначен'), 'medium', Finance::getUrl()));
             }
 
-            if ($clientRow['rate'] < 2000) {
-                $rows->push($this->attentionRow('client', $clientRow['client'], 'Низкая фактическая ставка', $this->money($clientRow['rate']).'/ч', 'Поднять цену или сократить объем', null, 'high', Finance::getUrl()));
-            } elseif ($clientRow['rate'] < $hourRate) {
-                $rows->push($this->attentionRow('client', $clientRow['client'], 'Низкая фактическая ставка', $this->money($clientRow['rate']).'/ч', 'Проверить экономику клиента', null, 'medium', Finance::getUrl()));
+            if ((float) ($rateRow['overrun_hours'] ?? 0) > 0) {
+                $rows->push($this->attentionRow('project', (string) $rateRow['project'], 'Перерасход часов', $this->hours((float) $rateRow['overrun_hours']), 'Выставить доп. счёт или пересогласовать лимит работ', (string) ($rateRow['manager'] ?? 'Не назначен'), (float) ($rateRow['progress_pct'] ?? 0) >= 100 ? 'high' : 'medium', Production::getUrl()));
             }
         }
 

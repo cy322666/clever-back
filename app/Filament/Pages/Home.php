@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Widgets\OwnerPulseAttentionTableWidget;
+use App\Filament\Widgets\OwnerPulseEffectiveRatesTableWidget;
 use App\Filament\Widgets\OwnerPulseMoneyStatsWidget;
 use App\Filament\Widgets\OwnerPulseOwnerHoursWidget;
 use App\Filament\Widgets\OwnerPulseProductionStatsWidget;
@@ -29,6 +30,7 @@ class Home extends AnalyticsPage
             $this->widget(OwnerPulseProductionStatsWidget::class, withPeriod: true),
             $this->widget(OwnerPulseOwnerHoursWidget::class, withPeriod: true),
             $this->widget(OwnerPulseAttentionTableWidget::class, withPeriod: true),
+            $this->widget(OwnerPulseEffectiveRatesTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseSalesSourcesTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseRiskProjectsTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseTeamLoadTableWidget::class, withPeriod: true),

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\EffectiveRatesTableWidget;
+use App\Filament\Widgets\EffectiveRateStatsOverviewWidget;
 use App\Filament\Widgets\FinanceStatsOverviewWidget;
 use App\Filament\Widgets\FinanceTopClientsTableWidget;
 use Filament\Support\Icons\Heroicon;
@@ -17,6 +19,8 @@ class Finance extends AnalyticsPage
     {
         return [
             $this->widget(FinanceStatsOverviewWidget::class, withPeriod: true),
+            $this->widget(EffectiveRateStatsOverviewWidget::class, withPeriod: true),
+            $this->widget(EffectiveRatesTableWidget::class, withPeriod: true),
             $this->widget(FinanceTopClientsTableWidget::class, withPeriod: true),
         ];
     }
