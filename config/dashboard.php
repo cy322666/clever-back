@@ -23,6 +23,8 @@ return [
         'client_watch_idle_days' => (int) env('CLIENT_WATCH_IDLE_DAYS', 14),
     ],
     'production_hour_rate' => (float) env('PRODUCTION_HOUR_RATE', 3000),
+    'owner_user_id' => env('OWNER_USER_ID'),
+    'owner_email' => env('OWNER_EMAIL'),
     'primary_sales_pipeline_name' => trim((string) env('AMO_PRIMARY_PIPELINE_NAME', 'Основная')),
     'repeat_sales_pipeline_name' => trim((string) env('AMO_REPEAT_PIPELINE_NAME', 'Повторные')),
     'support_pipeline_name' => trim((string) env('AMO_SUPPORT_PIPELINE_NAME', 'Сопровождение')),

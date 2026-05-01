@@ -18,7 +18,7 @@ class Dashboard extends BaseDashboard
 
     public function mount(): void
     {
-        $this->redirect(Sales::getUrl(), navigate: true);
+        $this->redirect(Home::getUrl(), navigate: true);
     }
 
     public function getWidgets(): array
