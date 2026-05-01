@@ -76,6 +76,7 @@ class SourceSyncService
             ->where('is_enabled', true)
             ->whereIn('source_key', $this->allowedSourceKeys())
             ->get()
+            ->sortBy(fn (SourceConnection $connection): int => $this->sourceOrder($connection->source_key))
             ->sum(fn (SourceConnection $connection) => $this->syncConnection($connection)->error_count === 0 ? 1 : 0);
     }
 
@@ -89,8 +90,9 @@ class SourceSyncService
         $connections = SourceConnection::query()
             ->where('is_enabled', true)
             ->whereIn('source_key', $this->allowedSourceKeys())
-            ->orderBy('id')
-            ->get();
+            ->get()
+            ->sortBy(fn (SourceConnection $connection): int => $this->sourceOrder($connection->source_key))
+            ->values();
 
         $results = [];
 
@@ -128,5 +130,15 @@ class SourceSyncService
     protected function allowedSourceKeys(): array
     {
         return array_keys(config('integrations.sources', []));
+    }
+
+    protected function sourceOrder(string $sourceKey): int
+    {
+        return [
+            'tochka' => 10,
+            'amo' => 20,
+            'weeek' => 30,
+            'bank' => 40,
+        ][$sourceKey] ?? 100;
     }
 }

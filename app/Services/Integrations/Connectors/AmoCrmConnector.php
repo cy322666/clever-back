@@ -27,6 +27,7 @@ class AmoCrmConnector
 {
     protected array $catalogElementCache = [];
     protected array $catalogListCache = [];
+    protected ?int $companyInnFieldId = null;
     protected array $pipelineCache = [];
     protected array $stageCache = [];
 
@@ -215,6 +216,12 @@ class AmoCrmConnector
                 $productModel->wasRecentlyCreated ? $created++ : $updated++;
             }
         }
+
+        $companySyncStats = $this->syncLocalCompaniesToAmo($settings);
+        $pulled += $companySyncStats['pulled'];
+        $created += $companySyncStats['created'];
+        $updated += $companySyncStats['updated'];
+        $warnings = array_merge($warnings, $companySyncStats['warnings']);
 
         $companies = Client::query()
             ->where('source_type', 'amo_company')
@@ -444,23 +451,246 @@ class AmoCrmConnector
 
     protected function upsertAmoCompanyClient(mixed $company, ?string $fallbackName = null): Client
     {
+        $company = $this->normalizeAmoEntity($company);
         $externalId = (string) data_get($company, 'id', '');
         $name = trim((string) data_get($company, 'name', $fallbackName ?: 'amoCRM company '.$externalId));
+        $inn = $this->extractAmoCompanyInn($company);
 
-        return Client::query()->updateOrCreate(
+        $client = Client::query()
+            ->where('source_type', 'amo_company')
+            ->where('external_id', $externalId)
+            ->first();
+
+        if (! $client && $inn !== null) {
+            $client = Client::query()->where('inn', $inn)->first();
+        }
+
+        $client ??= new Client();
+        $metadata = $client->metadata ?? [];
+
+        $client->forceFill([
+            'source_type' => 'amo_company',
+            'external_id' => $externalId,
+            'name' => $name !== '' ? $name : 'amoCRM company '.$externalId,
+            'legal_name' => $client->legal_name ?: ($name !== '' ? $name : null),
+            'inn' => $inn ?? $client->inn,
+            'category' => 'company',
+            'status' => 'active',
+            'metadata' => array_merge(is_array($metadata) ? $metadata : [], [
+                'amo_company' => $company,
+            ]),
+        ]);
+
+        $client->save();
+
+        return $client;
+    }
+
+    /**
+     * @return array{pulled:int, created:int, updated:int, warnings:array<int, string>}
+     */
+    protected function syncLocalCompaniesToAmo(array $settings): array
+    {
+        $stats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'warnings' => []];
+
+        $clients = Client::query()
+            ->whereNotNull('inn')
+            ->where('inn', '!=', '')
+            ->where(function ($query) {
+                $query
+                    ->whereNull('external_id')
+                    ->orWhere('external_id', '')
+                    ->orWhere('source_type', '!=', 'amo_company')
+                    ->orWhereNull('source_type');
+            })
+            ->orderBy('name')
+            ->get();
+
+        foreach ($clients as $client) {
+            $inn = $this->normalizeInn($client->inn);
+
+            if ($inn === null) {
+                continue;
+            }
+
+            try {
+                $amoCompany = $this->findAmoCompanyByInn($settings, $inn);
+                $createdInAmo = false;
+
+                if (! $amoCompany) {
+                    $amoCompany = $this->createAmoCompanyFromClient($settings, $client, $inn);
+                    $createdInAmo = true;
+                }
+
+                $client->forceFill([
+                    'source_type' => 'amo_company',
+                    'external_id' => (string) data_get($amoCompany, 'id', $client->external_id),
+                    'name' => trim((string) data_get($amoCompany, 'name', $client->name)) ?: $client->name,
+                    'legal_name' => $client->legal_name ?: $client->name,
+                    'inn' => $inn,
+                    'category' => 'company',
+                    'status' => 'active',
+                    'metadata' => array_merge(is_array($client->metadata) ? $client->metadata : [], [
+                        'amo_company' => $amoCompany,
+                        'amo_company_synced_at' => now()->toDateTimeString(),
+                    ]),
+                ]);
+                $client->save();
+
+                $stats['pulled']++;
+                $createdInAmo ? $stats['created']++ : $stats['updated']++;
+            } catch (Throwable $throwable) {
+                report($throwable);
+                $stats['warnings'][] = 'Company INN '.$inn.': '.$throwable->getMessage();
+            }
+        }
+
+        return $stats;
+    }
+
+    protected function findAmoCompanyByInn(array $settings, string $inn): ?array
+    {
+        $innFieldId = $this->companyInnFieldId($settings);
+
+        if ($innFieldId !== null) {
+            try {
+                $companies = $this->fetchAmoCollection($settings, '/api/v4/companies', [
+                    'filter' => [
+                        'custom_fields_values' => [
+                            $innFieldId => [$inn],
+                        ],
+                    ],
+                ], 'companies');
+
+                foreach ($companies as $company) {
+                    if ($this->extractAmoCompanyInn($company) === $inn) {
+                        return $company;
+                    }
+                }
+            } catch (Throwable $throwable) {
+                report($throwable);
+            }
+        }
+
+        $companies = $this->fetchAmoCollection($settings, '/api/v4/companies', [
+            'query' => $inn,
+        ], 'companies');
+
+        foreach ($companies as $company) {
+            if ($this->extractAmoCompanyInn($company) === $inn) {
+                return $company;
+            }
+        }
+
+        return null;
+    }
+
+    protected function createAmoCompanyFromClient(array $settings, Client $client, string $inn): array
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+
+        if ($baseUrl === '' || $token === '') {
+            throw new \RuntimeException('amoCRM is not configured');
+        }
+
+        $company = [
+            'name' => $client->legal_name ?: $client->name ?: 'Компания '.$inn,
+        ];
+        $innFieldId = $this->companyInnFieldId($settings);
+
+        if ($innFieldId === null) {
+            throw new \RuntimeException('amoCRM company INN custom field was not found. Set AMO_COMPANY_INN_FIELD_ID or AMO_COMPANY_INN_FIELD_NAME.');
+        }
+
+        $company['custom_fields_values'] = [
             [
-                'source_type' => 'amo_company',
-                'external_id' => $externalId,
-            ],
-            [
-                'name' => $name !== '' ? $name : 'amoCRM company '.$externalId,
-                'category' => 'company',
-                'status' => 'active',
-                'metadata' => [
-                    'amo_company' => $this->normalizeAmoEntity($company),
+                'field_id' => $innFieldId,
+                'values' => [
+                    ['value' => $inn],
                 ],
             ],
-        );
+        ];
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->post($baseUrl.'/api/v4/companies', [$company]);
+
+        $response->throw();
+
+        $created = data_get($response->json(), '_embedded.companies.0', []);
+
+        if (! is_array($created) || ! filled(data_get($created, 'id'))) {
+            throw new \RuntimeException('amoCRM did not return created company id');
+        }
+
+        return $created;
+    }
+
+    protected function companyInnFieldId(array $settings): ?int
+    {
+        if ($this->companyInnFieldId !== null) {
+            return $this->companyInnFieldId;
+        }
+
+        $configured = (int) ($settings['company_inn_field_id'] ?? config('services.amo.company_inn_field_id'));
+
+        if ($configured > 0) {
+            return $this->companyInnFieldId = $configured;
+        }
+
+        $fieldName = Str::lower((string) ($settings['company_inn_field_name'] ?? config('services.amo.company_inn_field_name', 'ИНН')));
+        $payload = $this->fetchAmoEntity($settings, '/api/v4/companies/custom_fields');
+        $fields = data_get($payload, '_embedded.custom_fields', []);
+
+        if (! is_array($fields)) {
+            return null;
+        }
+
+        foreach ($fields as $field) {
+            $name = Str::lower((string) data_get($field, 'name', data_get($field, 'field_name', '')));
+            $code = Str::lower((string) data_get($field, 'code', data_get($field, 'field_code', '')));
+
+            if ($name === $fieldName || $name === 'инн' || Str::contains($name, 'инн') || $code === 'inn') {
+                $id = (int) data_get($field, 'id', data_get($field, 'field_id', 0));
+
+                return $this->companyInnFieldId = $id > 0 ? $id : null;
+            }
+        }
+
+        return null;
+    }
+
+    protected function extractAmoCompanyInn(array $company): ?string
+    {
+        foreach (($company['custom_fields_values'] ?? []) as $field) {
+            $name = Str::lower((string) ($field['field_name'] ?? $field['name'] ?? ''));
+            $code = Str::lower((string) ($field['field_code'] ?? $field['code'] ?? ''));
+
+            if ($name !== 'инн' && ! Str::contains($name, 'инн') && $code !== 'inn') {
+                continue;
+            }
+
+            foreach (($field['values'] ?? []) as $value) {
+                $inn = $this->normalizeInn($value['value'] ?? null);
+
+                if ($inn !== null) {
+                    return $inn;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeInn(mixed $value): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $value) ?: '';
+
+        return in_array(strlen($digits), [10, 12], true) ? $digits : null;
     }
 
     /**

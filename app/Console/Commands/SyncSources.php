@@ -24,8 +24,9 @@ class SyncSources extends Command
                 $connections = SourceConnection::query()
                     ->where('is_enabled', true)
                     ->whereIn('source_key', array_keys(config('integrations.sources', [])))
-                    ->orderBy('id')
-                    ->get();
+                    ->get()
+                    ->sortBy(fn (SourceConnection $connection): int => $this->sourceOrder($connection->source_key))
+                    ->values();
 
                 if ($connections->isEmpty()) {
                     $this->warn('No enabled source connections found for the current account.');
@@ -103,5 +104,15 @@ class SyncSources extends Command
 
             return self::SUCCESS;
         }
+    }
+
+    protected function sourceOrder(string $sourceKey): int
+    {
+        return [
+            'tochka' => 10,
+            'amo' => 20,
+            'weeek' => 30,
+            'bank' => 40,
+        ][$sourceKey] ?? 100;
     }
 }

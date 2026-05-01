@@ -15,6 +15,8 @@ class Client extends Model
         'source_type',
         'name',
         'legal_name',
+        'inn',
+        'kpp',
         'category',
         'status',
         'metadata',

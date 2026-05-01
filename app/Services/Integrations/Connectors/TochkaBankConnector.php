@@ -197,7 +197,7 @@ class TochkaBankConnector implements SourceConnector
 
     protected function syncFinanceRows(BankStatementRow $statementRow, array $normalized, array $transaction): void
     {
-        $client = $this->matchClient((string) $normalized['counterparty_name']);
+        $client = $this->syncCounterpartyClient($normalized, $transaction);
         $transactionDate = $normalized['occurred_at'];
 
         if ($normalized['direction'] === 'in') {
@@ -347,6 +347,8 @@ class TochkaBankConnector implements SourceConnector
             'currency' => (string) data_get($transaction, 'Amount.currency', 'RUB'),
             'direction' => $direction,
             'counterparty_name' => trim((string) $counterparty) ?: null,
+            'counterparty_inn' => $this->extractCounterpartyInn($transaction, $direction),
+            'counterparty_kpp' => $this->extractCounterpartyKpp($transaction, $direction),
             'purpose' => trim((string) ($transaction['description'] ?? '')) ?: null,
             'category' => trim((string) ($transaction['transactionTypeCode'] ?? '')) ?: null,
             'status' => Str::lower((string) ($transaction['status'] ?? 'booked')),
@@ -409,6 +411,165 @@ class TochkaBankConnector implements SourceConnector
         return Client::query()
             ->whereRaw('lower(name) like ?', ['%'.mb_strtolower($counterparty).'%'])
             ->first();
+    }
+
+    protected function syncCounterpartyClient(array $normalized, array $transaction): ?Client
+    {
+        $name = trim((string) ($normalized['counterparty_name'] ?? ''));
+        $inn = $this->normalizeInn($normalized['counterparty_inn'] ?? null);
+        $kpp = $this->normalizeKpp($normalized['counterparty_kpp'] ?? null);
+
+        if ($name === '' && $inn === null) {
+            return null;
+        }
+
+        $client = $inn !== null
+            ? Client::query()->where('inn', $inn)->first()
+            : null;
+
+        if (! $client && $name !== '') {
+            $client = $this->matchClient($name);
+        }
+
+        if (! $client) {
+            $client = new Client([
+                'source_type' => 'tochka',
+                'status' => 'active',
+                'category' => 'company',
+            ]);
+        }
+
+        $metadata = $client->metadata ?? [];
+
+        $client->forceFill([
+            'name' => $client->name ?: $name,
+            'legal_name' => $client->legal_name ?: $name,
+            'inn' => $inn ?? $client->inn,
+            'kpp' => $kpp ?? $client->kpp,
+            'category' => $client->category ?: 'company',
+            'status' => $client->status ?: 'active',
+            'source_type' => $client->source_type ?: 'tochka',
+            'metadata' => array_merge(is_array($metadata) ? $metadata : [], [
+                'tochka_counterparty' => [
+                    'name' => $name !== '' ? $name : null,
+                    'inn' => $inn,
+                    'kpp' => $kpp,
+                    'last_transaction' => $transaction,
+                ],
+            ]),
+        ]);
+
+        $client->save();
+
+        return $client;
+    }
+
+    protected function extractCounterpartyInn(array $transaction, string $direction): ?string
+    {
+        $party = $this->counterpartyPayload($transaction, $direction);
+
+        return $this->normalizeInn($this->findValueByKeys($party, [
+            'inn',
+            'инн',
+            'innkio',
+            'taxid',
+            'tax_id',
+            'taxnumber',
+            'tax_number',
+            'taxidentificationnumber',
+            'tax_identification_number',
+            'payerinn',
+            'payer_inn',
+            'recipientinn',
+            'recipient_inn',
+            'counterpartyinn',
+            'counterparty_inn',
+            'debtorinn',
+            'debtor_inn',
+            'creditorinn',
+            'creditor_inn',
+        ]));
+    }
+
+    protected function extractCounterpartyKpp(array $transaction, string $direction): ?string
+    {
+        $party = $this->counterpartyPayload($transaction, $direction);
+
+        return $this->normalizeKpp($this->findValueByKeys($party, [
+            'kpp',
+            'кпп',
+            'payerkpp',
+            'payer_kpp',
+            'recipientkpp',
+            'recipient_kpp',
+            'counterpartykpp',
+            'counterparty_kpp',
+            'debtorkpp',
+            'debtor_kpp',
+            'creditorkpp',
+            'creditor_kpp',
+        ]));
+    }
+
+    protected function counterpartyPayload(array $transaction, string $direction): array
+    {
+        $party = $direction === 'in'
+            ? data_get($transaction, 'DebtorParty', [])
+            : data_get($transaction, 'CreditorParty', []);
+
+        return is_array($party) ? $party : [];
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    protected function findValueByKeys(mixed $payload, array $keys): mixed
+    {
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $normalizedKeys = collect($keys)
+            ->map(fn (string $key): string => $this->normalizeKey($key))
+            ->all();
+
+        foreach ($payload as $key => $value) {
+            if (in_array($this->normalizeKey((string) $key), $normalizedKeys, true)) {
+                return $value;
+            }
+
+            if (is_array($value)) {
+                $nested = $this->findValueByKeys($value, $keys);
+
+                if ($nested !== null && $nested !== '') {
+                    return $nested;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeKey(string $key): string
+    {
+        return Str::of($key)
+            ->lower()
+            ->replace(['_', '-', ' '], '')
+            ->toString();
+    }
+
+    protected function normalizeInn(mixed $value): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $value) ?: '';
+
+        return in_array(strlen($digits), [10, 12], true) ? $digits : null;
+    }
+
+    protected function normalizeKpp(mixed $value): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $value) ?: '';
+
+        return strlen($digits) === 9 ? $digits : null;
     }
 
     protected function resolveSettings(SourceConnection $connection): array
