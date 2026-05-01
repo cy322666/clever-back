@@ -9,6 +9,7 @@ use App\Filament\Widgets\OwnerPulseOwnerHoursWidget;
 use App\Filament\Widgets\OwnerPulseProductionStatsWidget;
 use App\Filament\Widgets\OwnerPulseRiskProjectsTableWidget;
 use App\Filament\Widgets\OwnerPulseSalesSourcesTableWidget;
+use App\Filament\Widgets\OwnerPulseSalesSourcesSummaryTableWidget;
 use App\Filament\Widgets\OwnerPulseSalesStatsWidget;
 use App\Filament\Widgets\OwnerPulseTeamLoadTableWidget;
 use BackedEnum;
@@ -31,6 +32,7 @@ class Home extends AnalyticsPage
             $this->widget(OwnerPulseOwnerHoursWidget::class, withPeriod: true),
             $this->widget(OwnerPulseAttentionTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseEffectiveRatesTableWidget::class, withPeriod: true),
+            $this->widget(OwnerPulseSalesSourcesSummaryTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseSalesSourcesTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseRiskProjectsTableWidget::class, withPeriod: true),
             $this->widget(OwnerPulseTeamLoadTableWidget::class, withPeriod: true),

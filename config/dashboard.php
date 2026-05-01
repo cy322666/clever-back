@@ -36,4 +36,13 @@ return [
         'trim',
         explode(',', (string) env('AMO_EXCLUDED_PIPELINE_NAMES', ''))
     ))),
+    'sales_stage_probability_map' => [
+        'нов' => 5,
+        'квал' => 15,
+        'предлож' => 40,
+        'кп' => 40,
+        'соглас' => 65,
+        'счет' => 80,
+        'оплат' => 90,
+    ],
 ];
