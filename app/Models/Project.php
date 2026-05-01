@@ -11,6 +11,7 @@ class Project extends Model
     protected $fillable = [
         'client_id',
         'manager_employee_id',
+        'responsible_employee_id',
         'support_contract_id',
         'source_system',
         'external_id',
@@ -59,6 +60,11 @@ class Project extends Model
     public function manager(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'manager_employee_id');
+    }
+
+    public function responsible(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'responsible_employee_id');
     }
 
     public function supportContract(): BelongsTo

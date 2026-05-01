@@ -40,11 +40,12 @@ class OwnerPulseAnalyticsService extends AnalyticsService
         $finance = $this->financeMetrics($period);
         $sales = $this->salesMetrics($period);
         $production = app(ProductionAnalyticsService::class)->build($period);
+        $responsibility = app(ProjectResponsibilityAnalyticsService::class)->build($period, $production);
         $productionMetrics = $this->productionMetrics($production, $hourRate);
-        $owner = $this->ownerMetrics($production, $period, $hourRate);
-        $attention = $this->attentionRows($period, $production, $owner, $hourRate);
+        $owner = $this->ownerMetrics($production, $period, $hourRate, $responsibility);
+        $attention = $this->attentionRows($period, $production, $owner, $hourRate, $responsibility);
         $riskProjects = $this->riskProjectRows($production, $hourRate);
-        $teamLoad = $this->teamLoadRows($period, $production, $hourRate, $owner);
+        $teamLoad = $this->teamLoadRows($period, $production, $hourRate, $owner, $responsibility);
         $sources = $this->salesSourceRows($period);
 
         return static::$cache[$cacheKey] = [
@@ -171,7 +172,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
         ];
     }
 
-    protected function ownerMetrics(array $production, AnalyticsPeriod $period, float $hourRate): array
+    protected function ownerMetrics(array $production, AnalyticsPeriod $period, float $hourRate, array $responsibility): array
     {
         $owner = $this->ownerEmployee();
         $employees = collect($production['employee_summary'] ?? []);
@@ -182,6 +183,9 @@ class OwnerPulseAnalyticsService extends AnalyticsService
         $hours = (float) ($ownerRow['hours'] ?? 0);
         $share = $totalHours > 0 ? ($hours / $totalHours) * 100 : 0;
         $cost = $hours * $hourRate;
+        $ownerResponsibility = $owner ? ($responsibility[$owner->id] ?? []) : [];
+        $responsibleProjects = (int) ($ownerResponsibility['responsible_projects_count'] ?? 0);
+        $redProjects = (int) ($ownerResponsibility['red_projects_count'] ?? 0);
         $status = match (true) {
             $hours >= 60 => ['label' => 'Перегруз', 'tone' => 'danger', 'hint' => '60+ ч/мес'],
             $hours >= 30 => ['label' => 'Внимание', 'tone' => 'warning', 'hint' => '30-60 ч/мес'],
@@ -197,13 +201,15 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             'hours' => $hours,
             'share' => $share,
             'cost' => $cost,
+            'responsible_projects_count' => $responsibleProjects,
+            'red_projects_count' => $redProjects,
             'status' => $status['label'],
             'tone' => $status['tone'],
             'card' => [
                 [
                     'label' => 'Мои часы в производстве',
                     'value' => $owner ? $this->hours($hours) : 'Не настроен',
-                    'hint' => $owner ? $status['label'].' · '.$this->percent($share).' команды · '.$this->money($cost) : $status['hint'],
+                    'hint' => $owner ? $status['label'].' · '.$this->percent($share).' команды · '.$responsibleProjects.' проектов · '.$redProjects.' в красной зоне' : $status['hint'],
                     'tone' => $status['tone'],
                     'description' => $owner ? 'Цель: меньше рутины, больше управления и сложных кейсов' : 'Укажи OWNER_USER_ID или OWNER_EMAIL',
                 ],
@@ -214,31 +220,31 @@ class OwnerPulseAnalyticsService extends AnalyticsService
     /**
      * @return array<int, array<string, mixed>>
      */
-    protected function attentionRows(AnalyticsPeriod $period, array $production, array $owner, float $hourRate): array
+    protected function attentionRows(AnalyticsPeriod $period, array $production, array $owner, float $hourRate, array $responsibility): array
     {
         $rows = collect();
         $projectRows = collect($production['project_summary'] ?? [])->where('project_status', 'active');
-        $projectsById = Project::query()->with(['client', 'manager'])->where('status', 'active')->get()->keyBy('id');
+        $projectsById = Project::query()->with(['client', 'manager', 'responsible'])->where('status', 'active')->get()->keyBy('id');
 
         foreach ($projectRows as $row) {
             $project = $projectsById->get((int) ($row['project_id'] ?? 0));
             $progress = (float) ($row['hours_progress_pct'] ?? 0);
 
             if ($progress >= 100) {
-                $rows->push($this->attentionRow('project', $row['project_name'] ?? 'Проект', 'Проект сверх плана', $this->percent($progress), 'Пересогласовать бюджет/лимит часов', $project?->manager?->name, 'high', Production::getUrl()));
+                $rows->push($this->attentionRow('project', $row['project_name'] ?? 'Проект', 'Проект сверх плана', $this->percent($progress), 'Пересогласовать бюджет/лимит часов', $project?->responsible?->name, 'high', Production::getUrl()));
             } elseif ($progress >= 80) {
-                $rows->push($this->attentionRow('project', $row['project_name'] ?? 'Проект', 'Риск перерасхода', $this->percent($progress), 'Проверить остаток плана и приоритизировать задачи', $project?->manager?->name, 'medium', Production::getUrl()));
+                $rows->push($this->attentionRow('project', $row['project_name'] ?? 'Проект', 'Риск перерасхода', $this->percent($progress), 'Проверить остаток плана и приоритизировать задачи', $project?->responsible?->name, 'medium', Production::getUrl()));
             }
         }
 
         foreach ($projectsById as $project) {
-            if (! $project->manager_employee_id) {
-                $rows->push($this->attentionRow('project', $project->name, 'Не назначен ответственный', 'Нет менеджера', 'Назначить ответственного', null, 'medium', Production::getUrl()));
+            if (! $project->responsible_employee_id) {
+                $rows->push($this->attentionRow('project', $project->name, 'Не назначен ответственный', 'Нет ответственного', 'Назначить ответственного', null, 'medium', Production::getUrl()));
             }
 
             $lastActivity = $project->last_activity_at ?? $project->updated_at;
             if ($lastActivity && CarbonImmutable::parse($lastActivity)->lessThanOrEqualTo(now()->subDays(7))) {
-                $rows->push($this->attentionRow('project', $project->name, 'Проект без движения', CarbonImmutable::parse($lastActivity)->format('d.m.Y'), 'Проверить статус и назначить следующее действие', $project->manager?->name, 'medium', Production::getUrl()));
+                $rows->push($this->attentionRow('project', $project->name, 'Проект без движения', CarbonImmutable::parse($lastActivity)->format('d.m.Y'), 'Проверить статус и назначить следующее действие', $project->responsible?->name, 'medium', Production::getUrl()));
             }
         }
 
@@ -253,7 +259,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
 
         foreach ($overdueByProject as $overdue) {
             $project = $projectsById->get((int) $overdue->project_id);
-            $rows->push($this->attentionRow('project', $project?->name ?: 'Проект #'.$overdue->project_id, 'Есть просрочки', $overdue->overdue_count.' задач', 'Разобрать просроченные задачи', $project?->manager?->name, 'high', Production::getUrl()));
+            $rows->push($this->attentionRow('project', $project?->name ?: 'Проект #'.$overdue->project_id, 'Есть просрочки', $overdue->overdue_count.' задач', 'Разобрать просроченные задачи', $project?->responsible?->name, 'high', Production::getUrl()));
         }
 
         foreach (app(EffectiveRateAnalyticsService::class)->build($period)['rows'] ?? [] as $rateRow) {
@@ -349,7 +355,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
                 $rows->push($this->attentionRow('deal', $deal->name ?: 'Сделка #'.$deal->id, 'Большая сделка без следующего действия', $this->money((float) $deal->amount).' · '.$this->percent((float) $deal->probability), 'Назначить следующий шаг и дату закрытия', $deal->owner?->name, 'high', Sales::getUrl()));
             });
 
-        foreach ($this->teamLoadRows($period, $production, $hourRate, $owner) as $employee) {
+        foreach ($this->teamLoadRows($period, $production, $hourRate, $owner, $responsibility) as $employee) {
             if (($employee['utilization_pct'] ?? 0) >= 95) {
                 $rows->push($this->attentionRow('employee', $employee['employee'], 'Перегруз сотрудника', $this->percent($employee['utilization_pct']), 'Снять часть задач или перенести сроки', null, 'high', Production::getUrl()));
             } elseif (($employee['utilization_pct'] ?? 0) >= 85) {
@@ -359,10 +365,22 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             if (($employee['overdue_tasks'] ?? 0) > 0) {
                 $rows->push($this->attentionRow('employee', $employee['employee'], 'Много просроченных задач', $employee['overdue_tasks'].' задач', 'Разобрать просрочки', null, 'medium', Production::getUrl()));
             }
+
+            if (($employee['responsible_projects_count'] ?? 0) > 5) {
+                $rows->push($this->attentionRow('employee', $employee['employee'], 'Много проектов в ответственности', $employee['responsible_projects_count'].' проектов', 'Перераспределить ответственность или подключить руководителя проекта', null, 'medium', Production::getUrl()));
+            }
+
+            if (($employee['red_projects_count'] ?? 0) > 2) {
+                $rows->push($this->attentionRow('employee', $employee['employee'], 'Много проектов в красной зоне', $employee['red_projects_count'].' проектов', 'Разобрать портфель и снять риски по срокам/часам', null, 'high', Production::getUrl()));
+            }
         }
 
         if (($owner['hours'] ?? 0) >= 60) {
             $rows->push($this->attentionRow('employee', $owner['employee']?->name ?: 'Основатель', 'Собственник перегружен производством', $this->hours((float) $owner['hours']), 'Делегировать рутину и оставить только сложные кейсы', $owner['employee']?->name, 'high', Production::getUrl()));
+        }
+
+        if (($owner['responsible_projects_count'] ?? 0) > 5) {
+            $rows->push($this->attentionRow('employee', $owner['employee']?->name ?: 'Основатель', 'Собственник держит много проектов', $owner['responsible_projects_count'].' проектов', 'Передать часть ответственности команде', $owner['employee']?->name, 'medium', Production::getUrl()));
         }
 
         return $rows
@@ -455,7 +473,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
      */
     protected function riskProjectRows(array $production, float $hourRate): array
     {
-        $projects = Project::query()->with(['client', 'manager'])->get()->keyBy('id');
+        $projects = Project::query()->with(['client', 'manager', 'responsible'])->get()->keyBy('id');
 
         return collect($production['project_summary'] ?? [])
             ->filter(fn (array $row): bool => ($row['project_status'] ?? null) === 'active' && (float) ($row['hours_progress_pct'] ?? 0) >= 80)
@@ -470,7 +488,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
                     'project' => (string) ($row['project_name'] ?? 'Проект'),
                     'client' => $project?->client?->name ?: 'Без клиента',
                     'project_type' => $this->projectTypeLabel((string) ($row['project_type'] ?? '')),
-                    'responsible' => $project?->manager?->name ?: 'Не назначен',
+                    'responsible' => $project?->responsible?->name ?: 'Не назначен',
                     'planned_hours' => (float) ($row['planned_hours_total'] ?? 0),
                     'fact_hours' => (float) ($row['hours'] ?? 0),
                     'progress_pct' => $progress,
@@ -486,7 +504,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
     /**
      * @return array<int, array<string, mixed>>
      */
-    protected function teamLoadRows(AnalyticsPeriod $period, array $production, float $hourRate, array $owner): array
+    protected function teamLoadRows(AnalyticsPeriod $period, array $production, float $hourRate, array $owner, array $responsibility): array
     {
         $employeesByUuid = Employee::query()
             ->whereNotNull('weeek_uuid')
@@ -502,22 +520,31 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             ->pluck('overdue_count', 'assignee_employee_id');
 
         $rows = collect($production['employee_summary'] ?? [])
-            ->map(function (array $row) use ($employeesByUuid, $overdueTasks, $hourRate, $owner): array {
+            ->map(function (array $row) use ($employeesByUuid, $overdueTasks, $hourRate, $owner, $responsibility): array {
                 $employeeUuid = (string) data_get($row, 'employee.id', '');
                 $employee = $employeesByUuid->get($employeeUuid);
                 $hours = (float) ($row['hours'] ?? 0);
                 $expected = (float) ($row['expected'] ?? 0);
                 $utilization = (float) ($row['utilization_pct'] ?? 0);
                 $isOwner = $owner['employee'] && $employee && (int) $employee->id === (int) $owner['employee']->id;
+                $responsibilityRow = $employee ? ($responsibility[$employee->id] ?? []) : [];
+                $responsibleProjectsCount = (int) ($responsibilityRow['responsible_projects_count'] ?? 0);
+                $redProjectsCount = (int) ($responsibilityRow['red_projects_count'] ?? 0);
+                $responsibleProjectNames = (array) ($responsibilityRow['project_names'] ?? []);
 
                 return [
                     '__key' => 'team-'.$employeeUuid,
+                    'employee_id' => $employee?->id,
                     'employee' => (string) data_get($row, 'employee.name', $employee?->name ?: 'Без сотрудника'),
                     'role' => $isOwner ? 'Основатель' : ($employee?->role_title ?: 'Сотрудник'),
                     'planned_hours' => $expected,
                     'fact_hours' => $hours,
                     'utilization_pct' => $utilization,
                     'active_projects' => count((array) ($row['projects'] ?? [])),
+                    'responsible_projects_count' => $responsibleProjectsCount,
+                    'red_projects_count' => $redProjectsCount,
+                    'responsible_projects' => implode(', ', $responsibleProjectNames),
+                    'active_project_names' => implode(', ', array_keys((array) ($row['projects'] ?? []))),
                     'overdue_tasks' => $employee ? (int) ($overdueTasks[$employee->id] ?? 0) : 0,
                     'earned' => $hours * $hourRate,
                     'owner_margin' => (float) ($row['owner_profit'] ?? 0),
@@ -528,15 +555,55 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             ->sortByDesc(fn (array $row): int => $row['is_owner'] ? 1 : 0)
             ->values();
 
+        $existingEmployeeIds = $rows
+            ->pluck('employee_id')
+            ->filter()
+            ->all();
+
+        $missingResponsibleEmployees = Employee::query()
+            ->whereIn('id', collect(array_keys($responsibility))->diff($existingEmployeeIds)->values())
+            ->get();
+
+        foreach ($missingResponsibleEmployees as $employee) {
+            $responsibilityRow = $responsibility[$employee->id] ?? [];
+            $isOwner = $owner['employee'] && (int) $employee->id === (int) $owner['employee']->id;
+
+            $rows->push([
+                '__key' => 'team-responsible-'.$employee->id,
+                'employee_id' => $employee->id,
+                'employee' => $employee->name,
+                'role' => $isOwner ? 'Основатель' : ($employee->role_title ?: 'Сотрудник'),
+                'planned_hours' => 0,
+                'fact_hours' => 0,
+                'utilization_pct' => 0,
+                'active_projects' => 0,
+                'responsible_projects_count' => (int) ($responsibilityRow['responsible_projects_count'] ?? 0),
+                'red_projects_count' => (int) ($responsibilityRow['red_projects_count'] ?? 0),
+                'responsible_projects' => implode(', ', (array) ($responsibilityRow['project_names'] ?? [])),
+                'active_project_names' => '',
+                'overdue_tasks' => (int) ($overdueTasks[$employee->id] ?? 0),
+                'earned' => 0,
+                'owner_margin' => 0,
+                'status' => 'Нет нагрузки',
+                'is_owner' => $isOwner,
+            ]);
+        }
+
         if ($owner['employee'] && $rows->where('is_owner', true)->isEmpty()) {
+            $responsibilityRow = $responsibility[$owner['employee']->id] ?? [];
             $rows->prepend([
                 '__key' => 'team-owner-empty',
+                'employee_id' => $owner['employee']->id,
                 'employee' => $owner['employee']->name,
                 'role' => 'Основатель',
                 'planned_hours' => 0,
                 'fact_hours' => 0,
                 'utilization_pct' => 0,
                 'active_projects' => 0,
+                'responsible_projects_count' => (int) ($responsibilityRow['responsible_projects_count'] ?? 0),
+                'red_projects_count' => (int) ($responsibilityRow['red_projects_count'] ?? 0),
+                'responsible_projects' => implode(', ', (array) ($responsibilityRow['project_names'] ?? [])),
+                'active_project_names' => '',
                 'overdue_tasks' => 0,
                 'earned' => 0,
                 'owner_margin' => 0,

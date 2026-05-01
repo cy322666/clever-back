@@ -46,7 +46,7 @@ class EffectiveRateAnalyticsService extends AnalyticsService
             ->values();
 
         $projects = Project::query()
-            ->with(['client', 'manager', 'supportContract'])
+            ->with(['client', 'manager', 'responsible', 'supportContract'])
             ->whereIn('id', $projectIds)
             ->get();
 
@@ -71,8 +71,8 @@ class EffectiveRateAnalyticsService extends AnalyticsService
                 'project_url' => \App\Filament\Pages\Production::getUrl(),
                 'project_type_key' => (string) ($project->project_type ?? 'other'),
                 'project_type' => $this->projectTypeLabel((string) ($project->project_type ?? '')),
-                'manager_key' => $project->manager?->id ? (string) $project->manager->id : 'none',
-                'manager' => $project->manager?->name ?: 'Не назначен',
+                'manager_key' => $project->responsible?->id ? (string) $project->responsible->id : 'none',
+                'manager' => $project->responsible?->name ?: 'Не назначен',
                 'revenue' => $revenue,
                 'fact_hours' => $factHours,
                 'planned_hours' => $plannedHours,

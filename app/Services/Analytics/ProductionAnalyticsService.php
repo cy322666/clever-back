@@ -20,7 +20,7 @@ class ProductionAnalyticsService extends AnalyticsService
         $threshold = config('dashboard.thresholds');
         $hourRate = (float) config('dashboard.production_hour_rate', 3000);
         $allProjects = Project::query()
-            ->with('supportContract')
+            ->with(['supportContract', 'responsible'])
             ->orderByRaw("case when status = 'active' then 0 else 1 end")
             ->orderBy('name')
             ->get();
@@ -426,6 +426,8 @@ class ProductionAnalyticsService extends AnalyticsService
             return [
                 'project_id' => $project->id,
                 'project_name' => $project->name,
+                'responsible_employee_id' => $project->responsible_employee_id,
+                'responsible_name' => $project->responsible?->name,
                 'project_type' => $project->project_type ?? 'hourly_until_date',
                 'project_status' => $project->status,
                 'start_date' => $project->start_date?->toDateString(),

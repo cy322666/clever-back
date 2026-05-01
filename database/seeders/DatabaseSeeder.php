@@ -262,10 +262,12 @@ class DatabaseSeeder extends Seeder
             $dueDate = $projectType === 'hourly_until_date'
                 ? $start->copy()->addDays(rand(25, 75))->toDateString()
                 : null;
+            $manager = $employees->random();
 
             return Project::query()->create([
                 'client_id' => $clients->random()->id,
-                'manager_employee_id' => $employees->random()->id,
+                'manager_employee_id' => $manager->id,
+                'responsible_employee_id' => $manager->id,
                 'source_system' => 'Weeek',
                 'external_id' => 'project-'.$i,
                 'name' => 'Проект #'.$i,

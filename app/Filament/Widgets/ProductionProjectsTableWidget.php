@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Employee;
 use App\Models\Project;
 use App\Services\Analytics\ProductionAnalyticsService;
 use App\Support\AnalyticsPeriod;
@@ -90,6 +91,23 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
     {
         return [
             TextColumn::make('project_name')->label('Проект')->wrap(),
+            SelectColumn::make('responsible_employee_id')
+                ->label('Ответственный')
+                ->options(fn (): array => ['' => 'Не назначен'] + Employee::query()
+                    ->where('is_active', true)
+                    ->orderBy('name')
+                    ->pluck('name', 'id')
+                    ->mapWithKeys(fn ($name, $id): array => [(string) $id => (string) $name])
+                    ->all())
+                ->selectablePlaceholder(false)
+                ->updateStateUsing(function ($state, array $record): ?string {
+                    $value = filled($state) ? (int) $state : null;
+                    $this->updateProject((int) $record['project_id'], [
+                        'responsible_employee_id' => $value,
+                    ]);
+
+                    return $value !== null ? (string) $value : null;
+                }),
             SelectColumn::make('project_type')
                 ->label('Тип')
                 ->options([

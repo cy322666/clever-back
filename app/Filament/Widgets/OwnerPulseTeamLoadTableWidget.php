@@ -49,7 +49,21 @@ class OwnerPulseTeamLoadTableWidget extends ArrayRecordsTableWidget
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ').'%')
                 ->color(fn ($state): string => (float) $state >= 95 ? 'danger' : ((float) $state >= 85 ? 'warning' : ((float) $state > 0 ? 'success' : 'gray')))
                 ->sortable(),
-            TextColumn::make('active_projects')->label('Активные проекты')->numeric()->sortable(),
+            TextColumn::make('active_projects')
+                ->label('Активные проекты')
+                ->numeric()
+                ->tooltip(fn (array $record): ?string => filled($record['active_project_names'] ?? null) ? (string) $record['active_project_names'] : null)
+                ->sortable(),
+            TextColumn::make('responsible_projects_count')
+                ->label('Ответственный за проектов')
+                ->numeric()
+                ->tooltip(fn (array $record): ?string => filled($record['responsible_projects'] ?? null) ? (string) $record['responsible_projects'] : null)
+                ->sortable(),
+            TextColumn::make('red_projects_count')
+                ->label('Проекты в красной зоне')
+                ->badge()
+                ->color(fn ($state): string => (int) $state > 2 ? 'danger' : ((int) $state > 0 ? 'warning' : 'success'))
+                ->sortable(),
             TextColumn::make('overdue_tasks')->label('Просроченные задачи')->numeric()->sortable(),
             TextColumn::make('earned')->label('Заработано по ставке 3000 ₽/ч')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
             TextColumn::make('owner_margin')->label('Маржа после ФОТ')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
