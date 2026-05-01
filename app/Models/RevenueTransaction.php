@@ -11,11 +11,14 @@ class RevenueTransaction extends Model
         'client_id',
         'project_id',
         'bank_statement_row_id',
+        'invoice_id',
         'source_system',
         'source_reference',
         'transaction_date',
         'posted_at',
         'amount',
+        'direction',
+        'transaction_type',
         'net_profit_percent',
         'currency',
         'category',
@@ -41,5 +44,20 @@ class RevenueTransaction extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
+    }
+
+    public function bankStatementRow(): BelongsTo
+    {
+        return $this->belongsTo(BankStatementRow::class);
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
     }
 }
