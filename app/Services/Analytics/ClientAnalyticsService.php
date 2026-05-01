@@ -155,7 +155,7 @@ class ClientAnalyticsService extends AnalyticsService
         }
 
         $activeClients = $rows->filter(fn (array $row) => $row['lead_count'] > 0 || $row['deal_count'] > 0 || $row['won_revenue'] > 0)->count();
-        $riskClients = $rows->filter(fn (array $row) => in_array($row['segment'], ['At risk', 'Watch'], true) || in_array($row['risk_level'], ['high', 'critical'], true))->count();
+        $riskClients = $rows->filter(fn (array $row) => in_array($row['segment'], ['Риск', 'Наблюдать'], true) || in_array($row['risk_level'], ['high', 'critical'], true))->count();
         $vipClients = $rows->where('segment', 'VIP')->count();
         $staleClients = $rows->filter(fn (array $row) => ($row['days_since_activity'] ?? 999) >= 30)->count();
         $wonRevenue = $rows->sum('won_revenue');
@@ -179,10 +179,10 @@ class ClientAnalyticsService extends AnalyticsService
 
         return [
             'kpis' => [
-                ['label' => 'Компаний из amo', 'value' => number_format($companyCount), 'hint' => 'Только компании с нужными сделками', 'tone' => 'brand'],
+                ['label' => 'Компаний из amoCRM', 'value' => number_format($companyCount), 'hint' => 'Только компании с нужными сделками', 'tone' => 'brand'],
                 ['label' => 'Сделок', 'value' => number_format($dealTotal), 'hint' => 'Все сделки по компаниям', 'tone' => 'slate'],
-                ['label' => 'Продаж', 'value' => number_format($salesTotal), 'hint' => 'Закрыто успешно', 'tone' => 'emerald'],
-                ['label' => 'Сумма продаж', 'value' => number_format($revenueTotal, 0, ',', ' '), 'hint' => 'Выигранные сделки', 'tone' => 'cyan'],
+                ['label' => 'Успешных продаж', 'value' => number_format($salesTotal), 'hint' => 'Закрыто успешно', 'tone' => 'emerald'],
+                ['label' => 'Выручка', 'value' => number_format($revenueTotal, 0, ',', ' '), 'hint' => 'Выигранные сделки', 'tone' => 'cyan'],
                 ['label' => 'Активных компаний', 'value' => number_format($activeCompanyCount), 'hint' => 'Есть сделки или выручка', 'tone' => 'amber'],
                 ['label' => 'Средний чек', 'value' => number_format($averageDealAmount, 0, ',', ' '), 'hint' => 'По выигранным сделкам', 'tone' => 'rose'],
             ],
@@ -218,18 +218,18 @@ class ClientAnalyticsService extends AnalyticsService
         }
 
         if (in_array($client->risk_level, ['high', 'critical'], true) || (($daysSinceActivity ?? 999) >= 21 && $dealCount > 0) || ($openCount >= 3 && $winRate < 20)) {
-            return ['label' => 'At risk', 'tone' => 'red'];
+            return ['label' => 'Риск', 'tone' => 'red'];
         }
 
         if ($wonRevenue >= 350_000 || $dealCount >= 3 || $winRate >= 30) {
-            return ['label' => 'Growth', 'tone' => 'blue'];
+            return ['label' => 'Рост', 'tone' => 'blue'];
         }
 
         if (($daysSinceActivity ?? 999) >= 14) {
-            return ['label' => 'Watch', 'tone' => 'yellow'];
+            return ['label' => 'Наблюдать', 'tone' => 'yellow'];
         }
 
-        return ['label' => 'Stable', 'tone' => 'slate'];
+        return ['label' => 'Стабильно', 'tone' => 'slate'];
     }
 
     protected function activityBand(int $daysSinceActivity): string

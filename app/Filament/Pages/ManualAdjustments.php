@@ -19,7 +19,8 @@ use Filament\Schemas\Components\Utilities\Get;
 class ManualAdjustments extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedPencilSquare;
-    protected static ?string $navigationLabel = 'Ручной ввод';
+    protected static ?string $navigationLabel = 'Справочники';
+    protected static ?string $title = 'Справочники и ручные корректировки';
     protected static ?int $navigationSort = 9;
 
     protected function widgets(): array

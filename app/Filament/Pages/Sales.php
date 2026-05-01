@@ -11,7 +11,8 @@ class Sales extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
     protected static ?string $navigationLabel = 'Продажи';
-    protected static ?int $navigationSort = 2;
+    protected static ?string $title = 'Продажи';
+    protected static ?int $navigationSort = 1;
 
     protected function widgets(): array
     {

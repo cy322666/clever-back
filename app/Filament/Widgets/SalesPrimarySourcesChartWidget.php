@@ -9,7 +9,7 @@ use Filament\Widgets\ChartWidget;
 
 class SalesPrimarySourcesChartWidget extends ChartWidget
 {
-    protected ?string $heading = 'Источники сделок в Основной';
+    protected ?string $heading = 'Источники сделок в основной воронке';
 
     protected int | string | array $columnSpan = 1;
 

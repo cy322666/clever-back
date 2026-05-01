@@ -149,7 +149,7 @@ class FinanceAnalyticsService extends AnalyticsService
         return [
             'kpis' => [
                 ['label' => 'Выручка', 'value' => number_format($cashIn, 0, ',', ' '), 'hint' => 'Все поступления за период', 'tone' => 'emerald', 'comparison' => $this->compareValues($cashIn, $previousCashIn)],
-                ['label' => 'Чистыми без зарплаты', 'value' => number_format($netProfitIn, 0, ',', ' '), 'hint' => 'По доле чистыми в поступлениях', 'tone' => 'cyan', 'comparison' => $this->compareValues($netProfitIn, $previousNetProfitIn)],
+                ['label' => 'Прибыль до зарплат', 'value' => number_format($netProfitIn, 0, ',', ' '), 'hint' => 'По доле прибыли в поступлениях', 'tone' => 'cyan', 'comparison' => $this->compareValues($netProfitIn, $previousNetProfitIn)],
                 ['label' => 'Маржинальность', 'value' => number_format($grossMarginPct, 1, ',', ' ').'%', 'hint' => 'Чистыми минус зарплаты', 'tone' => 'brand', 'comparison' => $this->compareValues($grossMarginPct, $previousGrossMarginPct)],
             ],
             'charts' => [

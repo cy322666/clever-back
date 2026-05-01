@@ -12,7 +12,8 @@ class Risks extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
     protected static ?string $navigationLabel = 'Риски';
-    protected static ?int $navigationSort = 7;
+    protected static ?string $title = 'Риски';
+    protected static ?int $navigationSort = 11;
 
     protected function widgets(): array
     {

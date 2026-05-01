@@ -55,7 +55,7 @@ class InvoiceAnalyticsService extends AnalyticsService
                     'comparison' => $this->compareValues($totalCount, $previousTotalCount),
                 ],
                 [
-                    'label' => 'Сумма счетов',
+                    'label' => 'Сумма выставленных счетов',
                     'value' => number_format($totalAmount, 0, ',', ' ') . ' ₽',
                     'hint' => 'Все счета',
                     'tone' => 'cyan',
@@ -69,14 +69,14 @@ class InvoiceAnalyticsService extends AnalyticsService
                     'comparison' => $this->compareValues($paidAmount, $previousPaidAmount),
                 ],
                 [
-                    'label' => 'К оплате',
+                    'label' => 'Ожидает оплаты',
                     'value' => number_format($openAmount, 0, ',', ' ') . ' ₽',
                     'hint' => 'Не оплаченные счета',
                     'tone' => 'amber',
                     'comparison' => $this->compareValues($openAmount, $previousOpenAmount),
                 ],
                 [
-                    'label' => 'Средний счет',
+                    'label' => 'Средний счёт',
                     'value' => number_format($averageAmount, 0, ',', ' ') . ' ₽',
                     'hint' => 'Средняя сумма',
                     'tone' => 'slate',

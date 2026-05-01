@@ -80,10 +80,10 @@ class OwnerPulseAnalyticsService extends AnalyticsService
         return [
             'cards' => [
                 ['label' => 'Выручка за период', 'value' => $this->money($revenue), 'hint' => 'Поступления', 'tone' => $revenue > 0 ? 'emerald' : 'gray', 'description' => $revenue > 0 ? 'Все оплаты за период' : 'Нет данных за выбранный период'],
-                ['label' => 'Чистая прибыль', 'value' => $this->money($netProfit), 'hint' => 'Чистыми минус зарплаты', 'tone' => $netProfit < 0 ? 'danger' : ($netProfit > 0 ? 'emerald' : 'gray'), 'description' => $revenue > 0 ? 'С учетом ФОТ' : 'Нет данных за выбранный период'],
+                ['label' => 'Чистая прибыль', 'value' => $this->money($netProfit), 'hint' => 'Прибыль минус зарплаты', 'tone' => $netProfit < 0 ? 'danger' : ($netProfit > 0 ? 'emerald' : 'gray'), 'description' => $revenue > 0 ? 'С учетом фонда оплаты труда' : 'Нет данных за выбранный период'],
                 ['label' => 'Маржинальность', 'value' => $margin === null ? 'Нет данных' : $this->percent($margin), 'hint' => 'Чистая прибыль / выручка', 'tone' => $margin === null ? 'gray' : ($margin < 20 ? 'warning' : 'success'), 'description' => $margin === null ? 'Нет данных за выбранный период' : 'После зарплат'],
-                ['label' => 'MRR сопровождения', 'value' => $this->money($mrr), 'hint' => 'Регулярная выручка', 'tone' => $mrr > 0 ? 'cyan' : 'gray', 'description' => $mrr > 0 ? 'Открытые сделки/проекты сопровождения' : 'Нет данных'],
-                ['label' => 'Ожидаемые оплаты 30 дней', 'value' => $this->money($expectedPayments), 'hint' => 'Покупатели next_price', 'tone' => $expectedPayments > 0 ? 'amber' : 'gray', 'description' => $expectedPayments > 0 ? 'Ближайшие оплаты' : 'Нет данных'],
+                ['label' => 'Регулярная выручка сопровождения', 'value' => $this->money($mrr), 'hint' => 'Ежемесячные оплаты', 'tone' => $mrr > 0 ? 'cyan' : 'gray', 'description' => $mrr > 0 ? 'Открытые сделки/проекты сопровождения' : 'Нет данных'],
+                ['label' => 'Ожидаемые оплаты 30 дней', 'value' => $this->money($expectedPayments), 'hint' => 'Следующие оплаты клиентов', 'tone' => $expectedPayments > 0 ? 'amber' : 'gray', 'description' => $expectedPayments > 0 ? 'Ближайшие оплаты' : 'Нет данных'],
                 ['label' => 'Счета к оплате', 'value' => $this->money($receivables), 'hint' => $openInvoicesCount.' счетов', 'tone' => $receivables > 0 ? 'amber' : 'gray', 'description' => $receivables > 0 ? 'Дебиторка' : 'Нет неоплаченных счетов'],
             ],
             'revenue' => $revenue,
@@ -123,10 +123,10 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             'cards' => [
                 ['label' => 'Новые лиды', 'value' => (string) $newLeads, 'hint' => 'За период', 'tone' => $newLeads > 0 ? 'brand' : 'gray', 'description' => $newLeads > 0 ? 'Входящий поток' : 'Нет данных за выбранный период'],
                 ['label' => 'Выигранные сделки', 'value' => (string) $wonCount, 'hint' => $this->money($wonAmount), 'tone' => $wonCount > 0 ? 'success' : 'gray', 'description' => $wonCount > 0 ? 'Оплаченные/успешные' : 'Нет данных за выбранный период'],
-                ['label' => 'Конверсия в оплату', 'value' => $conversion === null ? 'Нет данных' : $this->percent($conversion), 'hint' => 'Won / лиды', 'tone' => $conversion === null ? 'gray' : ($conversion < 10 ? 'warning' : 'success'), 'description' => $conversion === null ? 'Недостаточно данных' : 'По выбранному периоду'],
-                ['label' => 'Средний чек', 'value' => $this->money($averageCheck), 'hint' => 'По выигранным', 'tone' => $averageCheck > 0 ? 'cyan' : 'gray', 'description' => $averageCheck > 0 ? 'Средняя сумма won' : 'Нет данных'],
-                ['label' => 'Pipeline открытых сделок', 'value' => $this->money($pipeline), 'hint' => 'Сделки в работе', 'tone' => $pipeline > 0 ? 'amber' : 'gray', 'description' => $pipeline > 0 ? 'Будущие продажи' : 'Нет открытого pipeline'],
-                ['label' => 'Прогноз продаж', 'value' => $this->money($forecast), 'hint' => 'С учетом вероятности', 'tone' => $forecast > 0 ? 'emerald' : 'gray', 'description' => $forecast > 0 ? 'Weighted forecast' : 'Нет данных'],
+                ['label' => 'Конверсия в оплату', 'value' => $conversion === null ? 'Нет данных' : $this->percent($conversion), 'hint' => 'Выигранные сделки / лиды', 'tone' => $conversion === null ? 'gray' : ($conversion < 10 ? 'warning' : 'success'), 'description' => $conversion === null ? 'Недостаточно данных' : 'По выбранному периоду'],
+                ['label' => 'Средний чек', 'value' => $this->money($averageCheck), 'hint' => 'По выигранным', 'tone' => $averageCheck > 0 ? 'cyan' : 'gray', 'description' => $averageCheck > 0 ? 'Средняя сумма сделки' : 'Нет данных'],
+                ['label' => 'Воронка открытых сделок', 'value' => $this->money($pipeline), 'hint' => 'Сделки в работе', 'tone' => $pipeline > 0 ? 'amber' : 'gray', 'description' => $pipeline > 0 ? 'Будущие продажи' : 'Нет открытых сделок'],
+                ['label' => 'Прогноз продаж', 'value' => $this->money($forecast), 'hint' => 'С учетом вероятности', 'tone' => $forecast > 0 ? 'emerald' : 'gray', 'description' => $forecast > 0 ? 'Прогноз с учетом вероятности' : 'Нет данных'],
                 ['label' => 'Сделки без движения', 'value' => (string) $idleDeals, 'hint' => '5+ дней', 'tone' => $idleDeals > 0 ? 'danger' : 'success', 'description' => $idleDeals > 0 ? 'Нужен контакт/задача' : 'Все ок'],
             ],
             'new_leads' => $newLeads,
@@ -154,9 +154,9 @@ class OwnerPulseAnalyticsService extends AnalyticsService
 
         return [
             'cards' => [
-                ['label' => 'Часы факт', 'value' => $this->hours($factHours), 'hint' => 'За период', 'tone' => $factHours > 0 ? 'cyan' : 'gray', 'description' => $factHours > 0 ? 'Командные time entries' : 'Нет данных за выбранный период'],
-                ['label' => 'Стоимость часов', 'value' => $this->money($hoursCost), 'hint' => $this->money($hourRate).'/ч', 'tone' => $hoursCost > 0 ? 'emerald' : 'gray', 'description' => $hoursCost > 0 ? 'Факт × ставка' : 'Нет данных'],
-                ['label' => 'Перерасход часов', 'value' => $this->hours($overrunHours), 'hint' => 'По активным проектам', 'tone' => $overrunHours > 0 ? 'danger' : 'success', 'description' => $overrunHours > 0 ? 'Нужны действия' : 'В рамках плана'],
+                ['label' => 'Отработано часов', 'value' => $this->hours($factHours), 'hint' => 'За период', 'tone' => $factHours > 0 ? 'cyan' : 'gray', 'description' => $factHours > 0 ? 'Командный учет времени' : 'Нет данных за выбранный период'],
+                ['label' => 'Стоимость отработанных часов', 'value' => $this->money($hoursCost), 'hint' => $this->money($hourRate).'/ч', 'tone' => $hoursCost > 0 ? 'emerald' : 'gray', 'description' => $hoursCost > 0 ? 'Факт × ставка' : 'Нет данных'],
+                ['label' => 'Перерасход по проектам', 'value' => $this->hours($overrunHours), 'hint' => 'По активным проектам', 'tone' => $overrunHours > 0 ? 'danger' : 'success', 'description' => $overrunHours > 0 ? 'Нужны действия' : 'В рамках плана'],
                 ['label' => 'Проектов сверх плана', 'value' => (string) $overPlanCount, 'hint' => '100%+ выработки', 'tone' => $overPlanCount > 0 ? 'danger' : 'success', 'description' => $overPlanCount > 0 ? 'Проверь таблицу риска' : 'Нет перерасхода'],
                 ['label' => 'Средняя загрузка команды', 'value' => $avgUtilization === null ? 'Нет данных' : $this->percent($avgUtilization), 'hint' => 'От доступных часов', 'tone' => $avgUtilization === null ? 'gray' : ($avgUtilization >= 95 ? 'danger' : ($avgUtilization >= 85 ? 'warning' : 'success')), 'description' => $avgUtilization === null ? 'Нет сотрудников/часов' : 'По выбранному периоду'],
                 ['label' => 'Активные проекты', 'value' => (string) $activeCount, 'hint' => 'В работе', 'tone' => $activeCount > 0 ? 'brand' : 'gray', 'description' => $activeCount > 0 ? 'Текущий портфель' : 'Нет активных проектов'],
@@ -189,7 +189,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
         };
 
         if (! $owner) {
-            $status = ['label' => 'Не настроен', 'tone' => 'gray', 'hint' => 'OWNER_USER_ID/OWNER_EMAIL'];
+            $status = ['label' => 'Не настроен', 'tone' => 'gray', 'hint' => 'Укажите основателя в настройках окружения'];
         }
 
         return [
@@ -277,7 +277,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             ->limit(20)
             ->get()
             ->each(function (Buyer $buyer) use ($rows): void {
-                $rows->push($this->attentionRow('client', $buyer->client?->name ?: $buyer->name ?: 'Покупатель #'.$buyer->id, 'Нет плана развития', $this->money((float) $buyer->ltv), 'Запланировать следующий шаг по клиенту', null, 'medium', Sales::getUrl()));
+                $rows->push($this->attentionRow('client', $buyer->client?->name ?: $buyer->name ?: 'Клиент #'.$buyer->id, 'Нет плана развития', $this->money((float) $buyer->ltv), 'Запланировать следующий шаг по клиенту', null, 'medium', Sales::getUrl()));
             });
 
         Buyer::query()
@@ -285,7 +285,7 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             ->whereBetween('next_date', [now(), now()->addDays(7)])
             ->get()
             ->each(function (Buyer $buyer) use ($rows): void {
-                $rows->push($this->attentionRow('client', $buyer->client?->name ?: $buyer->name ?: 'Покупатель #'.$buyer->id, 'Проверить продление/оплату', optional($buyer->next_date)->format('d.m.Y'), 'Связаться до даты оплаты', null, 'medium', Sales::getUrl()));
+                $rows->push($this->attentionRow('client', $buyer->client?->name ?: $buyer->name ?: 'Клиент #'.$buyer->id, 'Проверить продление/оплату', optional($buyer->next_date)->format('d.m.Y'), 'Связаться до даты оплаты', null, 'medium', Sales::getUrl()));
             });
 
         $this->openInvoices()->limit(30)->get()->each(function (Invoice $invoice) use ($rows): void {

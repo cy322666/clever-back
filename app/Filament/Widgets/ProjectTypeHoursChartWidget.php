@@ -9,7 +9,7 @@ use Filament\Widgets\ChartWidget;
 
 class ProjectTypeHoursChartWidget extends ChartWidget
 {
-    protected ?string $heading = 'Проекты по типам';
+    protected ?string $heading = 'Проекты по типам оплаты';
 
     protected int | string | array $columnSpan = 1;
 

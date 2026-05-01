@@ -60,7 +60,7 @@ class RepairWeeekEmployees extends Command
                     'name' => $name,
                     'email' => $email !== '' ? $email : 'weeek-'.$externalId.'@example.com',
                     'weeek_uuid' => $externalId,
-                    'role_title' => 'Production',
+                    'role_title' => 'Производство',
                     'is_active' => true,
                     'capacity_hours_per_week' => 40,
                     'weekly_limit_hours' => 40,

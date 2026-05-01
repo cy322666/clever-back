@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
 
 class EmployeeProductionChartWidget extends ChartWidget
 {
-    protected ?string $heading = 'Часы по дням';
+    protected ?string $heading = 'Отработанные часы по дням';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -34,7 +34,7 @@ class EmployeeProductionChartWidget extends ChartWidget
 
     public function getHeading(): string | Htmlable | null
     {
-        return 'Часы по дням: ' . $this->selectedEmployeeName();
+        return 'Отработанные часы по дням: ' . $this->selectedEmployeeName();
     }
 
     public function getDescription(): string | Htmlable | null
@@ -76,7 +76,7 @@ class EmployeeProductionChartWidget extends ChartWidget
             'labels' => $labels,
             'datasets' => [
                 [
-                    'label' => 'Часы',
+                    'label' => 'Отработано часов',
                     'data' => $values,
                     'backgroundColor' => 'rgba(59, 130, 246, 0.75)',
                     'borderColor' => 'rgba(59, 130, 246, 1)',

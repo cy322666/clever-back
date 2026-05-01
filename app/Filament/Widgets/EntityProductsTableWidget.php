@@ -8,7 +8,7 @@ use Filament\Tables\Columns\TextColumn;
 
 class EntityProductsTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Проданные товары';
+    protected static ?string $heading = 'Проданные услуги';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -39,13 +39,13 @@ class EntityProductsTableWidget extends ArrayRecordsTableWidget
     protected function getTableColumns(): array
     {
         return [
-            TextColumn::make('product_name')->label('Товар')->wrap()->searchable(),
+            TextColumn::make('product_name')->label('Услуга')->wrap()->searchable(),
             TextColumn::make('category')
                 ->label('Категория')
                 ->wrap()
                 ->sortable(),
             TextColumn::make('entities_count')
-                ->label('Сущностей')
+                ->label('Продаж/клиентов')
                 ->sortable(),
             TextColumn::make('quantity')
                 ->label('Кол-во')

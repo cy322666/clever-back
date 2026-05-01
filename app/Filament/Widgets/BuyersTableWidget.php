@@ -10,7 +10,7 @@ use Filament\Tables\Columns\TextColumn;
 
 class BuyersTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Список покупателей';
+    protected static ?string $heading = 'Клиенты с оплатами';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -38,7 +38,7 @@ class BuyersTableWidget extends ArrayRecordsTableWidget
                 return [
                     'id' => $buyer->id,
                     '__key' => (string) $buyer->id,
-                    'name' => $name !== '' ? $name : 'Покупатель #'.$externalId,
+                    'name' => $name !== '' ? $name : 'Клиент #'.$externalId,
                     'company' => $buyer->client?->name ?? '—',
                     'status' => $buyer->status ?: '—',
                     'periodicity' => $this->periodicityLabel($buyer->periodicity),
@@ -58,20 +58,20 @@ class BuyersTableWidget extends ArrayRecordsTableWidget
     protected function getTableColumns(): array
     {
         return [
-            TextColumn::make('name')->label('Покупатель')->wrap()->searchable(),
+            TextColumn::make('name')->label('Клиент')->wrap()->searchable(),
             TextColumn::make('company')->label('Компания')->wrap()->searchable(),
             TextColumn::make('status')->label('Статус')->badge()->sortable(),
-            TextColumn::make('periodicity')->label('Периодичность')->badge(),
-            TextColumn::make('purchases_count')->label('Покупок')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' '))->sortable(),
+            TextColumn::make('periodicity')->label('Периодичность оплаты')->badge(),
+            TextColumn::make('purchases_count')->label('Оплат')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' '))->sortable(),
             TextColumn::make('average_check')->label('Средний чек')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             TextColumn::make('ltv')->label('LTV')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
-            TextColumn::make('next_price')->label('Следующая сумма')->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ') . ' ₽' : '—')->sortable(),
-            TextColumn::make('next_date')->label('Следующая дата')->dateTime('d.m.Y')->placeholder('—')->sortable(),
+            TextColumn::make('next_price')->label('Следующая оплата')->formatStateUsing(fn ($state) => (float) $state > 0 ? number_format((float) $state, 0, ',', ' ') . ' ₽' : '—')->sortable(),
+            TextColumn::make('next_date')->label('Дата следующей оплаты')->dateTime('d.m.Y')->placeholder('—')->sortable(),
             IconColumn::make('amo_url')
                 ->label('')
                 ->icon('heroicon-m-arrow-top-right-on-square')
                 ->color(fn (?string $state) => filled($state) ? 'primary' : 'gray')
-                ->tooltip('Открыть покупателя в amo')
+                ->tooltip('Открыть клиента в amoCRM')
                 ->url(fn (?string $state) => $state)
                 ->openUrlInNewTab(),
         ];

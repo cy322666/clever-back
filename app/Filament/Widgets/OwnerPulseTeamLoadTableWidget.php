@@ -32,7 +32,7 @@ class OwnerPulseTeamLoadTableWidget extends ArrayRecordsTableWidget
         return parent::table($table)
             ->defaultSort('utilization_pct', 'desc')
             ->emptyStateHeading('Нет данных за выбранный период')
-            ->emptyStateDescription('Нет сотрудников или time entries за выбранный период.');
+            ->emptyStateDescription('Нет сотрудников или записей учета времени за выбранный период.');
     }
 
     protected function getTableColumns(): array
@@ -51,8 +51,8 @@ class OwnerPulseTeamLoadTableWidget extends ArrayRecordsTableWidget
                 ->sortable(),
             TextColumn::make('active_projects')->label('Активные проекты')->numeric()->sortable(),
             TextColumn::make('overdue_tasks')->label('Просроченные задачи')->numeric()->sortable(),
-            TextColumn::make('earned')->label('Заработано 3000 ₽/ч')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
-            TextColumn::make('owner_margin')->label('Маржа собственника')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
+            TextColumn::make('earned')->label('Заработано по ставке 3000 ₽/ч')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
+            TextColumn::make('owner_margin')->label('Маржа после ФОТ')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
             TextColumn::make('status')
                 ->label('Статус')
                 ->badge()

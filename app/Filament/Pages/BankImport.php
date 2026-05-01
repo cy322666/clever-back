@@ -16,6 +16,7 @@ class BankImport extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
     protected static ?string $navigationLabel = 'Импорт выписки';
+    protected static ?string $title = 'Импорт банковской выписки';
     protected static ?int $navigationSort = 10;
 
     protected function widgets(): array
@@ -43,9 +44,9 @@ class BankImport extends AnalyticsPage
                         ->directory('imports/tmp'),
                     TextInput::make('date_column')->label('Колонка даты')->default('date'),
                     TextInput::make('amount_column')->label('Колонка суммы')->default('amount'),
-                    TextInput::make('direction_column')->label('Колонка направления')->default('direction'),
-                    TextInput::make('counterparty_column')->label('Колонка контрагента')->default('counterparty'),
-                    TextInput::make('purpose_column')->label('Колонка назначения')->default('purpose'),
+                    TextInput::make('direction_column')->label('Колонка типа операции')->default('direction'),
+                    TextInput::make('counterparty_column')->label('Колонка клиента')->default('counterparty'),
+                    TextInput::make('purpose_column')->label('Колонка назначения платежа')->default('purpose'),
                     TextInput::make('category_column')->label('Колонка категории')->default('category'),
                 ])
                 ->action(function (array $data): void {

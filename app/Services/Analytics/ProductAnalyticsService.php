@@ -65,39 +65,39 @@ class ProductAnalyticsService extends AnalyticsService
         return [
             'kpis' => [
                 [
-                    'label' => 'Товаров',
+                    'label' => 'Услуг',
                     'value' => number_format($rowsCount),
-                    'hint' => 'Уникальные товары',
+                    'hint' => 'Уникальные услуги',
                     'tone' => 'brand',
                 ],
                 [
-                    'label' => 'Сумма товаров',
+                    'label' => 'Сумма услуг',
                     'value' => number_format($totalAmount, 0, ',', ' '),
-                    'hint' => 'Сделки + покупатели',
+                    'hint' => 'Сделки + клиенты',
                     'tone' => 'emerald',
                 ],
                 [
-                    'label' => 'Сделок с товарами',
+                    'label' => 'Сделок с услугами',
                     'value' => number_format($dealEntities),
                     'hint' => 'Уникальные сделки',
                     'tone' => 'cyan',
                 ],
                 [
-                    'label' => 'Покупателей с товарами',
+                    'label' => 'Клиентов с услугами',
                     'value' => number_format($customerEntities),
-                    'hint' => 'Уникальные buyers',
+                    'hint' => 'Уникальные клиенты',
                     'tone' => 'amber',
                 ],
                 [
-                    'label' => 'Средняя строка',
+                    'label' => 'Средняя сумма позиции',
                     'value' => number_format($avgRowAmount, 0, ',', ' '),
                     'hint' => 'Средний чек позиции',
                     'tone' => 'slate',
                 ],
                 [
-                    'label' => 'Среднее количество',
+                    'label' => 'Среднее количество услуг',
                     'value' => number_format($avgQuantity, 1, ',', ' '),
-                    'hint' => 'На строку товара',
+                    'hint' => 'На строку услуги',
                     'tone' => 'rose',
                 ],
             ],
@@ -184,7 +184,7 @@ class ProductAnalyticsService extends AnalyticsService
 
                 if ($entityName === '') {
                     $entityName = match ((string) $product->entity_type) {
-                        'customer' => 'Покупатель #'.$entityExternalId,
+                        'customer' => 'Клиент #'.$entityExternalId,
                         default => 'Сделка #'.$entityExternalId,
                     };
                 }
@@ -193,7 +193,7 @@ class ProductAnalyticsService extends AnalyticsService
                 $productName = trim((string) $product->product_name);
 
                 if ($productName === '') {
-                    $productName = $productExternalId !== '' ? 'Товар #'.$productExternalId : 'Товар #'.$product->id;
+                    $productName = $productExternalId !== '' ? 'Услуга #'.$productExternalId : 'Услуга #'.$product->id;
                 }
 
                 return [
@@ -301,7 +301,7 @@ class ProductAnalyticsService extends AnalyticsService
             $productName = trim((string) data_get($item, 'name', data_get($item, 'product_name', '')));
 
             if ($productName === '') {
-                $productName = 'Товар #'.($productExternalId !== '' ? $productExternalId : ($index + 1));
+                $productName = 'Услуга #'.($productExternalId !== '' ? $productExternalId : ($index + 1));
             }
 
             $quantity = (float) data_get($item, 'quantity', data_get($item, 'count', 1));

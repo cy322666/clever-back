@@ -47,7 +47,7 @@ class OwnerPulseSalesSourcesTableWidget extends ArrayRecordsTableWidget
             TextColumn::make('conversion')->label('Конверсия')->formatStateUsing(fn ($state) => $state === null ? 'Нет данных' : number_format((float) $state, 1, ',', ' ').'%')->sortable(),
             TextColumn::make('revenue')->label('Выручка')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
             TextColumn::make('average_check')->label('Средний чек')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
-            TextColumn::make('pipeline')->label('Pipeline')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
+            TextColumn::make('pipeline')->label('Воронка')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
             TextColumn::make('forecast')->label('Прогноз')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ').' ₽')->sortable(),
             TextColumn::make('status')->label('Комментарий/статус')->badge()->color(fn ($state): string => match ((string) $state) {
                 'Работает' => 'success',

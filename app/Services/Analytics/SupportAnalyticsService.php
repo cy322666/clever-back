@@ -143,7 +143,7 @@ class SupportAnalyticsService extends AnalyticsService
             'kpis' => [
                 ['label' => 'Закрыто успешно', 'value' => number_format($wonPeriodCount), 'hint' => 'За период', 'tone' => 'emerald', 'comparison' => $this->compareValues($wonPeriodCount, $previousWonPeriodCount)],
                 ['label' => 'Закрыто в минус', 'value' => number_format($lostPeriodCount), 'hint' => 'За период', 'tone' => 'rose', 'comparison' => $this->compareValues($lostPeriodCount, $previousLostPeriodCount)],
-                ['label' => 'Сумма в работе', 'value' => number_format($openAmount, 0, ',', ' '), 'hint' => 'Open amount', 'tone' => 'cyan', 'comparison' => $this->compareValues($openAmount, $previousOpenAmount)],
+                ['label' => 'Сумма в работе', 'value' => number_format($openAmount, 0, ',', ' '), 'hint' => 'Открытые сделки', 'tone' => 'cyan', 'comparison' => $this->compareValues($openAmount, $previousOpenAmount)],
             ],
             'charts' => [
                 'movement_series' => [

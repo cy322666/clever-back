@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 
 class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
 {
-    protected ?string $heading = 'Аналитика сотрудника';
+    protected ?string $heading = 'Аналитика по сотруднику';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -45,7 +45,7 @@ class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
 
         return [
             [
-                'label' => 'Часы факт',
+                'label' => 'Отработано часов',
                 'value' => number_format($hours, 1, ',', ' ') . ' ч',
                 'hint' => $entries . ' записей',
                 'tone' => 'cyan',
@@ -59,7 +59,7 @@ class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
                 'comparison' => $this->compareValues($utilizationPct, $previousUtilizationPct),
             ],
             [
-                'label' => 'Заработано',
+                'label' => 'Заработано по ставке',
                 'value' => number_format($earned, 0, ',', ' ') . ' ₽',
                 'hint' => '3000 ₽ / час',
                 'tone' => 'emerald',
@@ -73,7 +73,7 @@ class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
                 'comparison' => $this->compareValues($hourCostByPeriod, (float) ($previous['hour_cost_by_period'] ?? 0)),
             ],
             [
-                'label' => 'Маржа собственника',
+                'label' => 'Маржа после ФОТ',
                 'value' => number_format($ownerProfit, 0, ',', ' ') . ' ₽',
                 'hint' => 'Часы × 3000 - зарплата',
                 'tone' => $ownerProfit < 0 ? 'danger' : 'cyan',
@@ -84,7 +84,7 @@ class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
 
     protected function getHeading(): ?string
     {
-        return 'Аналитика сотрудника: ' . $this->selectedEmployeeName();
+        return 'Аналитика по сотруднику: ' . $this->selectedEmployeeName();
     }
 
     protected function getDescription(): ?string

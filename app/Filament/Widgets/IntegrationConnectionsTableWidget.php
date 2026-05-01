@@ -34,11 +34,11 @@ class IntegrationConnectionsTableWidget extends ArrayRecordsTableWidget
     {
         return [
             TextColumn::make('name')->label('Источник')->wrap(),
-            TextColumn::make('driver')->label('Driver')->badge(),
-            TextColumn::make('source_key')->label('Key')->badge(),
+            TextColumn::make('driver')->label('Тип подключения')->badge(),
+            TextColumn::make('source_key')->label('Код источника')->badge(),
             TextColumn::make('status')->label('Статус')->badge(),
             TextColumn::make('is_enabled')->label('Включён'),
-            TextColumn::make('last_synced_at')->label('Синк')->dateTime('d.m.Y H:i')->placeholder('—'),
+            TextColumn::make('last_synced_at')->label('Последняя синхронизация')->dateTime('d.m.Y H:i')->placeholder('—'),
             TextColumn::make('last_error_at')->label('Ошибка')->dateTime('d.m.Y H:i')->placeholder('—'),
         ];
     }

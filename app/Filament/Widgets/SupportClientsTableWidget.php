@@ -40,7 +40,7 @@ class SupportClientsTableWidget extends ArrayRecordsTableWidget
         return [
             TextColumn::make('label')->label('Компания')->wrap(),
             TextColumn::make('deals_count')->label('Сделки')->sortable(),
-            TextColumn::make('won_amount')->label('Won')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextColumn::make('won_amount')->label('Успешные продажи')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             TextColumn::make('total_amount')->label('Сумма')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
         ];
     }

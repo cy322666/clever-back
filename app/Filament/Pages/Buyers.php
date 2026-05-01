@@ -10,9 +10,11 @@ class Buyers extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
-    protected static ?string $navigationLabel = 'Покупатели';
+    protected static ?string $navigationLabel = 'Продления';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?string $title = 'Продления';
+
+    protected static ?int $navigationSort = 6;
 
     protected function widgets(): array
     {

@@ -15,7 +15,8 @@ class Invoices extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
     protected static ?string $navigationLabel = 'Счета';
-    protected static ?int $navigationSort = 3;
+    protected static ?string $title = 'Счета';
+    protected static ?int $navigationSort = 4;
 
     protected function widgets(): array
     {
@@ -32,7 +33,7 @@ class Invoices extends AnalyticsPage
     {
         return [
             Action::make('syncInvoices')
-                ->label('Синк счетов')
+                ->label('Синхронизировать счета')
                 ->icon(Heroicon::OutlinedArrowPath)
                 ->action(function (): void {
                     app(SourceConnectionBootstrapper::class)->ensureDefaults();

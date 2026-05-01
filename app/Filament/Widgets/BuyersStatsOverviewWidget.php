@@ -7,7 +7,7 @@ use App\Support\AnalyticsPeriod;
 
 class BuyersStatsOverviewWidget extends AnalyticsStatsOverviewWidget
 {
-    protected ?string $heading = 'Покупатели';
+    protected ?string $heading = 'Продления';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -33,11 +33,11 @@ class BuyersStatsOverviewWidget extends AnalyticsStatsOverviewWidget
         $ltvTotal = (float) (clone $buyers)->sum('ltv');
 
         return [
-            ['label' => 'Покупателей', 'value' => number_format($totalBuyers), 'hint' => 'Всего из amo customers', 'tone' => 'brand'],
-            ['label' => 'С покупками', 'value' => number_format($buyersWithPurchases), 'hint' => 'purchases_count > 0', 'tone' => 'emerald'],
+            ['label' => 'Клиентов', 'value' => number_format($totalBuyers), 'hint' => 'Клиенты из amoCRM', 'tone' => 'brand'],
+            ['label' => 'С оплатами', 'value' => number_format($buyersWithPurchases), 'hint' => 'Есть оплаты', 'tone' => 'emerald'],
             ['label' => 'Следующие оплаты', 'value' => number_format($nextPaymentsCount), 'hint' => $period->label(), 'tone' => 'amber'],
             ['label' => 'Сумма следующих оплат', 'value' => number_format($nextPaymentsAmount, 0, ',', ' ') . ' ₽', 'hint' => $period->label(), 'tone' => 'cyan'],
-            ['label' => 'LTV', 'value' => number_format($ltvTotal, 0, ',', ' ') . ' ₽', 'hint' => 'По всем покупателям', 'tone' => 'slate'],
+            ['label' => 'LTV', 'value' => number_format($ltvTotal, 0, ',', ' ') . ' ₽', 'hint' => 'По всем клиентам', 'tone' => 'slate'],
         ];
     }
 

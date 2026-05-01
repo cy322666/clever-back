@@ -36,7 +36,7 @@ class WeeekProjectsTableWidget extends ArrayRecordsTableWidget
             TextColumn::make('client_name')->label('Клиент')->wrap(),
             TextColumn::make('status')->label('Статус')->badge(),
             TextColumn::make('current_stage')->label('Стадия')->placeholder('—'),
-            TextColumn::make('risk_score')->label('Risk score')->sortable(),
+            TextColumn::make('risk_score')->label('Оценка риска')->sortable(),
         ];
     }
 }

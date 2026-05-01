@@ -70,7 +70,7 @@ class DatabaseSeeder extends Seeder
             public function company(): string
             {
                 $prefixes = ['Nova', 'Prime', 'Atlas', 'Vertex', 'Astra', 'Clever', 'Focus', 'Orbit'];
-                $suffixes = ['Group', 'Studio', 'Lab', 'Systems', 'Partners', 'Works', 'Media', 'Digital'];
+            $suffixes = ['Групп', 'Студия', 'Лаборатория', 'Системы', 'Партнеры', 'Проекты', 'Медиа', 'Диджитал'];
 
                 return $prefixes[array_rand($prefixes)].' '.$suffixes[array_rand($suffixes)];
             }
@@ -86,24 +86,24 @@ class DatabaseSeeder extends Seeder
         }
 
         User::query()->create([
-            'name' => 'Owner',
+            'name' => 'Собственник',
             'email' => 'owner@example.com',
             'password' => 'password',
         ]);
 
-        $departments = collect(['Sales', 'Production', 'Support', 'Finance', 'Management'])->map(function (string $name) use ($company) {
+        $departments = collect(['Продажи', 'Производство', 'Сопровождение', 'Финансы', 'Управление'])->map(function (string $name) use ($company) {
             return Department::query()->create([
                 'name' => $name,
             ]);
         });
 
         $employees = collect([
-            ['name' => 'Анна Морозова', 'department' => 'Sales', 'role' => 'Sales lead', 'capacity' => 40],
-            ['name' => 'Дмитрий Лебедев', 'department' => 'Production', 'role' => 'Project manager', 'capacity' => 38],
-            ['name' => 'Елена Соколова', 'department' => 'Production', 'role' => 'Analyst', 'capacity' => 36],
-            ['name' => 'Игорь Петров', 'department' => 'Support', 'role' => 'Support lead', 'capacity' => 34],
-            ['name' => 'Марина Кузнецова', 'department' => 'Finance', 'role' => 'Finance manager', 'capacity' => 30],
-            ['name' => 'Павел Орлов', 'department' => 'Production', 'role' => 'Developer', 'capacity' => 40],
+            ['name' => 'Анна Морозова', 'department' => 'Продажи', 'role' => 'Руководитель продаж', 'capacity' => 40],
+            ['name' => 'Дмитрий Лебедев', 'department' => 'Производство', 'role' => 'Руководитель проекта', 'capacity' => 38],
+            ['name' => 'Елена Соколова', 'department' => 'Производство', 'role' => 'Аналитик', 'capacity' => 36],
+            ['name' => 'Игорь Петров', 'department' => 'Сопровождение', 'role' => 'Руководитель сопровождения', 'capacity' => 34],
+            ['name' => 'Марина Кузнецова', 'department' => 'Финансы', 'role' => 'Финансовый менеджер', 'capacity' => 30],
+            ['name' => 'Павел Орлов', 'department' => 'Производство', 'role' => 'Разработчик', 'capacity' => 40],
         ])->map(function (array $data) use ($company, $departments) {
             $salary = rand(150000, 280000);
             $monthlyNormHours = max(1, $data['capacity'] * 4.333333);
@@ -122,19 +122,19 @@ class DatabaseSeeder extends Seeder
         });
 
         $clients = collect([
-            ['name' => 'Ритейл Плюс', 'risk' => 'normal', 'category' => 'Retail'],
-            ['name' => 'АвтоДилер Центр', 'risk' => 'high', 'category' => 'Automotive'],
-            ['name' => 'МедТех', 'risk' => 'normal', 'category' => 'Healthcare'],
-            ['name' => 'Alpha Logistics', 'risk' => 'critical', 'category' => 'Logistics'],
-            ['name' => 'СтройТочка', 'risk' => 'normal', 'category' => 'Construction'],
-            ['name' => 'Sky Finance', 'risk' => 'normal', 'category' => 'Finance'],
-            ['name' => 'B2B Market', 'risk' => 'high', 'category' => 'E-commerce'],
-            ['name' => 'LeadForge', 'risk' => 'normal', 'category' => 'SaaS'],
+            ['name' => 'Ритейл Плюс', 'risk' => 'normal', 'category' => 'Ритейл'],
+            ['name' => 'АвтоДилер Центр', 'risk' => 'high', 'category' => 'Авто'],
+            ['name' => 'МедТех', 'risk' => 'normal', 'category' => 'Медицина'],
+            ['name' => 'Alpha Logistics', 'risk' => 'critical', 'category' => 'Логистика'],
+            ['name' => 'СтройТочка', 'risk' => 'normal', 'category' => 'Строительство'],
+            ['name' => 'Sky Finance', 'risk' => 'normal', 'category' => 'Финансы'],
+            ['name' => 'B2B Market', 'risk' => 'high', 'category' => 'Электронная коммерция'],
+            ['name' => 'LeadForge', 'risk' => 'normal', 'category' => 'SaaS-сервис'],
         ])->map(function (array $data) use ($company, $employees, $faker) {
             return Client::query()->create([
                 'owner_employee_id' => $employees->random()->id,
                 'name' => $data['name'],
-                'legal_name' => $data['name'].' LLC',
+                'legal_name' => $data['name'].' ООО',
                 'category' => $data['category'],
                 'source_type' => 'amoCRM',
                 'status' => 'active',
@@ -193,8 +193,8 @@ class DatabaseSeeder extends Seeder
                 'owner_employee_id' => $employees->random()->id,
                 'source_system' => 'amoCRM',
                 'external_id' => 'lead-'.$i,
-                'name' => 'Lead #'.$i,
-                'source_channel' => $faker->randomElement(['site', 'referral', 'ads', 'telegram', 'cold']),
+                'name' => 'Заявка #'.$i,
+                'source_channel' => $faker->randomElement(['Сайт', 'Сарафан', 'Реклама', 'Telegram', 'Холодный контакт']),
                 'status' => $faker->randomElement(['new', 'qualified', 'contacted', 'converted']),
                 'budget_amount' => rand(120000, 850000),
                 'lead_created_at' => $leadDate,
@@ -268,11 +268,11 @@ class DatabaseSeeder extends Seeder
                 'manager_employee_id' => $employees->random()->id,
                 'source_system' => 'Weeek',
                 'external_id' => 'project-'.$i,
-                'name' => 'Project #'.$i,
+                'name' => 'Проект #'.$i,
                 'code' => 'PRJ-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
                 'status' => $faker->randomElement(['active', 'active', 'active', 'paused', 'done']),
                 'project_type' => $projectType,
-                'current_stage' => $faker->randomElement(['Discovery', 'Delivery', 'QA', 'Launch', 'Support']),
+                'current_stage' => $faker->randomElement(['Исследование', 'Разработка', 'Тестирование', 'Запуск', 'Сопровождение']),
                 'start_date' => $start->toDateString(),
                 'due_date' => $dueDate,
                 'next_action_at' => $faker->boolean(80) ? $now->addDays(rand(1, 8)) : null,
@@ -293,7 +293,7 @@ class DatabaseSeeder extends Seeder
             collect(range(1, 3))->each(function (int $index) use ($project, $now, $faker) {
                 ProjectStage::query()->create([
                     'project_id' => $project->id,
-                    'name' => $faker->randomElement(['Discovery', 'Design', 'Delivery', 'QA', 'Launch']),
+                    'name' => $faker->randomElement(['Исследование', 'Дизайн', 'Разработка', 'Тестирование', 'Запуск']),
                     'order_index' => $index,
                     'status' => $index === 3 ? 'active' : 'done',
                     'started_at' => $now->subDays(rand(5, 45)),
@@ -319,7 +319,7 @@ class DatabaseSeeder extends Seeder
             return SupportContract::query()->create([
                 'client_id' => $clients->random()->id,
                 'owner_employee_id' => $employees->random()->id,
-                'name' => 'Support '.$i,
+                'name' => 'Сопровождение '.$i,
                 'contract_type' => 'support',
                 'monthly_hours_limit' => rand(12, 60),
                 'monthly_fee' => rand(45000, 260000),
@@ -395,7 +395,7 @@ class DatabaseSeeder extends Seeder
                 'posted_at' => $date,
                 'amount' => $amount,
                 'currency' => 'RUB',
-                'category' => $faker->randomElement(['Project payment', 'Support', 'Consulting']),
+                'category' => $faker->randomElement(['Оплата проекта', 'Сопровождение', 'Консалтинг']),
                 'channel' => $faker->randomElement(['bank', 'card', 'cash']),
                 'status' => 'posted',
                 'is_recurring' => $faker->boolean(20),
@@ -409,8 +409,8 @@ class DatabaseSeeder extends Seeder
                 'entry_date' => $date->toDateString(),
                 'kind' => 'in',
                 'amount' => $amount,
-                'category' => 'Revenue',
-                'description' => 'Seed revenue '.$i,
+                'category' => 'Выручка',
+                'description' => 'Демо-поступление '.$i,
                 'client_id' => $clients->random()->id,
                 'project_id' => $projects->random()->id,
             ]);
@@ -428,7 +428,7 @@ class DatabaseSeeder extends Seeder
                 'posted_at' => $date,
                 'amount' => $amount,
                 'currency' => 'RUB',
-                'category' => $faker->randomElement(['Payroll', 'Marketing', 'Software', 'Outsource', 'Office']),
+                'category' => $faker->randomElement(['Зарплаты', 'Маркетинг', 'ПО', 'Подрядчики', 'Офис']),
                 'vendor_name' => $faker->company(),
                 'status' => 'posted',
                 'is_fixed' => $faker->boolean(50),
@@ -442,8 +442,8 @@ class DatabaseSeeder extends Seeder
                 'entry_date' => $date->toDateString(),
                 'kind' => 'out',
                 'amount' => $amount,
-                'category' => 'Expense',
-                'description' => 'Seed expense '.$i,
+                'category' => 'Расход',
+                'description' => 'Демо-расход '.$i,
                 'client_id' => null,
                 'project_id' => null,
             ]);
@@ -485,7 +485,7 @@ class DatabaseSeeder extends Seeder
                 'type' => $faker->randomElement(['project_idle', 'deal_idle', 'support_overage', 'low_margin_client']),
                 'severity' => $faker->randomElement(['warning', 'critical']),
                 'status' => 'open',
-                'title' => 'Demo alert #'.$i,
+                'title' => 'Демо-риск #'.$i,
                 'description' => $faker->sentence(),
                 'entity_type' => Project::class,
                 'entity_id' => $projects->random()->id,
@@ -496,8 +496,8 @@ class DatabaseSeeder extends Seeder
 
         collect([
             ['name' => 'VIP', 'color' => '#38bdf8'],
-            ['name' => 'Risk', 'color' => '#f43f5e'],
-            ['name' => 'Support', 'color' => '#22c55e'],
+            ['name' => 'Риск', 'color' => '#f43f5e'],
+            ['name' => 'Сопровождение', 'color' => '#22c55e'],
         ])->each(function (array $tag) use ($company) {
             Tag::query()->create([
                 'name' => $tag['name'],
@@ -516,7 +516,7 @@ class DatabaseSeeder extends Seeder
                 'external_id' => $mapping['external_id'],
                 'internal_type' => $mapping['internal_type'],
                 'internal_id' => $mapping['internal_id'],
-                'label' => 'Demo mapping',
+                'label' => 'Демо-связь',
                 'is_primary' => true,
                 'metadata' => ['demo' => true],
             ]);

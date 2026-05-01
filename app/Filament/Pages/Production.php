@@ -16,7 +16,8 @@ class Production extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCog8Tooth;
     protected static ?string $navigationLabel = 'Производство';
-    protected static ?int $navigationSort = 4;
+    protected static ?string $title = 'Производство';
+    protected static ?int $navigationSort = 2;
 
     protected function widgets(): array
     {

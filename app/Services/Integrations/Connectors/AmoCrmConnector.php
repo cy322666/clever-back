@@ -21,7 +21,7 @@ use Throwable;
 use Ufee\AmoV4\ApiClient;
 
 /**
- * Коннектор amoCRM для синхронизации сделок, покупателей и товарных позиций.
+ * Коннектор amoCRM для синхронизации сделок, клиентов и услуг.
  */
 class AmoCrmConnector
 {
@@ -57,7 +57,7 @@ class AmoCrmConnector
         $settings = $this->resolveSettings($connection);
 
         if (! $this->isConfigured($settings)) {
-            return SyncResult::fail('amoCRM is not configured');
+            return SyncResult::fail('amoCRM не настроен');
         }
 
         $pipelineIds = Pipeline::query()
@@ -162,7 +162,7 @@ class AmoCrmConnector
             }
             } catch (Throwable $throwable) {
                 report($throwable);
-                $warnings[] = 'Leads pipeline '.$pipelineId.': '.$throwable->getMessage();
+                $warnings[] = 'Лиды воронки '.$pipelineId.': '.$throwable->getMessage();
             }
         }
 
@@ -172,7 +172,7 @@ class AmoCrmConnector
             ], 'customers');
         } catch (Throwable $throwable) {
             report($throwable);
-            $warnings[] = 'Customers: '.$throwable->getMessage();
+            $warnings[] = 'Клиенты: '.$throwable->getMessage();
             $customers = [];
         }
 
@@ -242,7 +242,7 @@ class AmoCrmConnector
                 $updated++;
             } catch (Throwable $throwable) {
                 report($throwable);
-                $warnings[] = 'Company '.$companyModel->external_id.': '.$throwable->getMessage();
+                $warnings[] = 'Компания '.$companyModel->external_id.': '.$throwable->getMessage();
             }
         }
 
@@ -279,7 +279,7 @@ class AmoCrmConnector
                 $updated++;
             } catch (\Throwable $e) {
                 report($e);
-                $warnings[] = 'Product '.$productModel->external_id.': '.$e->getMessage();
+                $warnings[] = 'Услуга '.$productModel->external_id.': '.$e->getMessage();
 
             }
         }
@@ -291,13 +291,13 @@ class AmoCrmConnector
                 $amoApi = $this->buildAmoClient($settings);
 
                 if (! $amoApi) {
-                    throw new \RuntimeException('Unable to build amoCRM client');
+                    throw new \RuntimeException('Не удалось создать клиент amoCRM');
                 }
 
                 $invoiceStats = $this->syncInvoices($amoApi, $connection, $settings);
             } catch (Throwable $throwable) {
                 report($throwable);
-                $warnings[] = 'Invoices: '.$throwable->getMessage();
+                $warnings[] = 'Счета: '.$throwable->getMessage();
                 $invoiceStats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'failed' => true];
             }
         }
@@ -780,7 +780,7 @@ class AmoCrmConnector
                 'entity_name' => $entityName !== '' ? $entityName : $entityType.' #'.$entityExternalId,
                 'entity_date' => $entityDate?->toDateTimeString(),
                 'product_external_id' => $productExternalId !== '' ? $productExternalId : null,
-                'product_name' => trim((string) data_get($catalogElement, 'name', 'Товар #'.$productExternalId)),
+                'product_name' => trim((string) data_get($catalogElement, 'name', 'Услуга #'.$productExternalId)),
                 'quantity' => $quantity,
                 'unit_price' => (float) data_get($catalogElement, 'price', data_get($catalogElement, 'unit_price', 0)),
                 'total_amount' => (float) data_get($catalogElement, 'total', data_get($catalogElement, 'total_price', 0)),
@@ -1175,7 +1175,7 @@ class AmoCrmConnector
             $productName = trim((string) data_get($productDetails, 'name', data_get($item, 'name', data_get($item, 'product_name', ''))));
 
             if ($productName === '') {
-                $productName = ($catalogName !== null ? $catalogName : 'Товар').' #'.($productExternalId !== '' ? $productExternalId : ($index + 1));
+                $productName = ($catalogName !== null ? $catalogName : 'Услуга').' #'.($productExternalId !== '' ? $productExternalId : ($index + 1));
             }
 
             $quantity = (float) data_get($item, 'quantity', data_get($item, 'metadata.quantity', data_get($item, 'count', 1)));

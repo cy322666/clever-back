@@ -308,11 +308,11 @@ class OwnerDashboardService extends AnalyticsService
             ],
             'kpis' => [
                 ['label' => 'Новые сделки в Основной', 'value' => number_format($leadCount), 'hint' => 'За выбранный период', 'tone' => 'brand'],
-                ['label' => 'Сделки в работе', 'value' => number_format($openDeals), 'hint' => 'Open pipeline сейчас', 'tone' => 'slate'],
-                ['label' => 'Успешные сделки', 'value' => number_format($wonDeals), 'hint' => 'Won за период', 'tone' => 'emerald'],
-                ['label' => 'Выручка по выигранным', 'value' => number_format($wonRevenue, 0, ',', ' '), 'hint' => 'Won amount', 'tone' => 'cyan'],
-                ['label' => 'Прогноз pipeline', 'value' => number_format($forecast, 0, ',', ' '), 'hint' => 'Weighted open deals', 'tone' => 'amber'],
-                ['label' => 'Чистый cashflow', 'value' => number_format($revenue - $expenses, 0, ',', ' '), 'hint' => 'Поступления минус расходы', 'tone' => 'rose'],
+                ['label' => 'Сделки в работе', 'value' => number_format($openDeals), 'hint' => 'Открытая воронка сейчас', 'tone' => 'slate'],
+                ['label' => 'Успешные сделки', 'value' => number_format($wonDeals), 'hint' => 'Выиграно за период', 'tone' => 'emerald'],
+                ['label' => 'Выручка по выигранным', 'value' => number_format($wonRevenue, 0, ',', ' '), 'hint' => 'Сумма выигранных сделок', 'tone' => 'cyan'],
+                ['label' => 'Прогноз продаж', 'value' => number_format($forecast, 0, ',', ' '), 'hint' => 'Открытые сделки с учетом вероятности', 'tone' => 'amber'],
+                ['label' => 'Денежный результат', 'value' => number_format($revenue - $expenses, 0, ',', ' '), 'hint' => 'Поступления минус расходы', 'tone' => 'rose'],
             ],
             'signals' => [
                 'tracked_hours' => round($hours, 1),

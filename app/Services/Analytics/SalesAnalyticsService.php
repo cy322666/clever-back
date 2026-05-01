@@ -163,24 +163,24 @@ class SalesAnalyticsService extends AnalyticsService
 
         return [
             'kpis' => [
-                ['label' => 'Успешные сделки в Основной', 'value' => number_format((clone $primaryWonDealsPeriodBase)->count()), 'hint' => 'Только success stage 142', 'tone' => 'brand', 'comparison' => $this->compareValues((clone $primaryWonDealsPeriodBase)->count(), (clone $previousPrimaryWonDealsPeriodBase)->count())],
-                ['label' => 'Успешные сделки в Повторной', 'value' => number_format((clone $repeatWonDealsPeriodBase)->count()), 'hint' => 'Только success stage 142', 'tone' => 'brand', 'comparison' => $this->compareValues((clone $repeatWonDealsPeriodBase)->count(), (clone $previousRepeatWonDealsPeriodBase)->count())],
-                ['label' => 'Сопровождение', 'value' => number_format($supportOpenAmount, 0, ',', ' ') . ' ₽', 'hint' => 'Проектов: ' . number_format($supportProjectCount), 'tone' => 'amber'],
-                ['label' => 'Выиграно', 'value' => number_format($wonAmount, 0, ',', ' '), 'hint' => 'Сравнение с предыдущим периодом', 'tone' => 'emerald', 'comparison' => $this->compareValues($wonAmount, $previousWonAmount)],
-                ['label' => 'Конверсия', 'value' => number_format($conversion, 1, ',', ' ').'%', 'hint' => 'Closed win rate', 'tone' => 'cyan', 'comparison' => $this->compareValues($conversion, $previousConversion)],
-                ['label' => 'Прогноз', 'value' => number_format($forecast, 0, ',', ' '), 'hint' => 'Weighted open pipeline', 'tone' => 'amber', 'comparison' => $this->compareValues($forecast, $previousForecast)],
+                ['label' => 'Успешные сделки в основной воронке', 'value' => number_format((clone $primaryWonDealsPeriodBase)->count()), 'hint' => 'Успешный этап 142', 'tone' => 'brand', 'comparison' => $this->compareValues((clone $primaryWonDealsPeriodBase)->count(), (clone $previousPrimaryWonDealsPeriodBase)->count())],
+                ['label' => 'Успешные сделки в повторной воронке', 'value' => number_format((clone $repeatWonDealsPeriodBase)->count()), 'hint' => 'Успешный этап 142', 'tone' => 'brand', 'comparison' => $this->compareValues((clone $repeatWonDealsPeriodBase)->count(), (clone $previousRepeatWonDealsPeriodBase)->count())],
+                ['label' => 'Выручка сопровождения', 'value' => number_format($supportOpenAmount, 0, ',', ' ') . ' ₽', 'hint' => 'Проектов: ' . number_format($supportProjectCount), 'tone' => 'amber'],
+                ['label' => 'Выиграно сделок', 'value' => number_format($wonAmount, 0, ',', ' '), 'hint' => 'Сравнение с предыдущим периодом', 'tone' => 'emerald', 'comparison' => $this->compareValues($wonAmount, $previousWonAmount)],
+                ['label' => 'Конверсия в оплату', 'value' => number_format($conversion, 1, ',', ' ').'%', 'hint' => 'Конверсия закрытия', 'tone' => 'cyan', 'comparison' => $this->compareValues($conversion, $previousConversion)],
+                ['label' => 'Прогноз продаж', 'value' => number_format($forecast, 0, ',', ' '), 'hint' => 'Прогноз с учетом вероятности', 'tone' => 'amber', 'comparison' => $this->compareValues($forecast, $previousForecast)],
             ],
             'charts' => [
                 'sources' => $this->namedSeries($sources),
                 'sources_won' => $this->namedSeries($wonSources),
             ],
             'funnel' => [
-                ['label' => 'Успешные сделки в Основной', 'value' => (clone $primaryWonDealsPeriodBase)->count()],
-                ['label' => 'Успешные сделки в Повторной', 'value' => (clone $repeatWonDealsPeriodBase)->count()],
+                ['label' => 'Успешные сделки в основной воронке', 'value' => (clone $primaryWonDealsPeriodBase)->count()],
+                ['label' => 'Успешные сделки в повторной воронке', 'value' => (clone $repeatWonDealsPeriodBase)->count()],
                 ['label' => 'Квалификация', 'value' => (clone $salesBase)->where('sales_opportunities.status', 'qualified')->count()],
                 ['label' => 'Предложение', 'value' => (clone $salesBase)->where('sales_opportunities.status', 'proposal')->count()],
                 ['label' => 'Согласование', 'value' => (clone $salesBase)->where('sales_opportunities.status', 'negotiation')->count()],
-                ['label' => 'Won', 'value' => $wonCount],
+                ['label' => 'Выиграно', 'value' => $wonCount],
             ],
             'top_deals' => $topDeals,
             'period' => $period,

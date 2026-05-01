@@ -11,7 +11,8 @@ use Filament\Support\Icons\Heroicon;
 class Integrations extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCircleStack;
-    protected static ?string $navigationLabel = 'Источники';
+    protected static ?string $navigationLabel = 'Настройки';
+    protected static ?string $title = 'Настройки источников';
     protected static ?int $navigationSort = 8;
 
     protected function widgets(): array
@@ -30,7 +31,7 @@ class Integrations extends AnalyticsPage
     {
         return [
             Action::make('syncAll')
-                ->label('Синк всех источников')
+                ->label('Синхронизировать все источники')
                 ->icon(Heroicon::OutlinedArrowPath)
                 ->action(function (): void {
                     app(\App\Services\Integrations\SourceSyncService::class)->syncAllDetailed();

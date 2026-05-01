@@ -37,7 +37,7 @@ class SalesSourcesChartWidget extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label' => 'Won сделки',
+                    'label' => 'Успешные сделки',
                     'data' => $sources['values'] ?? [],
                     'backgroundColor' => 'rgba(16, 185, 129, 0.65)',
                     'borderColor' => 'rgba(16, 185, 129, 1)',

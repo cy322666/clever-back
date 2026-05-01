@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Часов отработано';
+    protected static ?string $heading = 'Отработанные часы по сотрудникам';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -89,7 +89,7 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                 ->label('Сотрудник')
                 ->wrap(),
             TextColumn::make('hours_total')
-                ->label('Часы')
+                ->label('Отработано часов')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . ' ч')
                 ->sortable(),
             TextColumn::make('load_percent')
@@ -104,11 +104,11 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
                 ->sortable(),
             TextColumn::make('earned_total')
-                ->label('Заработано')
+                ->label('Заработано по ставке')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
                 ->sortable(),
             TextColumn::make('owner_profit_total')
-                ->label('Маржа собственника')
+                ->label('Маржа после ФОТ')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
                 ->sortable(),
         ];

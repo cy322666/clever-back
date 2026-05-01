@@ -7,7 +7,7 @@ use App\Support\AnalyticsPeriod;
 
 class ProductsStatsOverviewWidget extends AnalyticsStatsOverviewWidget
 {
-    protected ?string $heading = 'Товары';
+    protected ?string $heading = 'Услуги';
 
     protected int | string | array $columnSpan = 'full';
 

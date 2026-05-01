@@ -150,8 +150,8 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
                 ->formatStateUsing(fn ($state) => $state === null ? '—' : number_format((float) $state, 1, ',', ' ') . '%')
                 ->color(fn ($state) => $state !== null && (float) $state > 100 ? 'danger' : ((float) $state >= 90 ? 'warning' : 'success'))
                 ->sortable(),
-            TextColumn::make('salary_cost')->label('ФОТ')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
-            TextColumn::make('owner_profit')->label('Маржа')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextColumn::make('salary_cost')->label('Фонд оплаты труда')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextColumn::make('owner_profit')->label('Маржа после ФОТ')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
         ];
     }
 

@@ -9,7 +9,7 @@ use Filament\Widgets\ChartWidget;
 
 class EmployeeHoursChartWidget extends ChartWidget
 {
-    protected ?string $heading = 'Часы по сотрудникам';
+    protected ?string $heading = 'Отработанные часы по сотрудникам';
 
     protected int | string | array $columnSpan = 1;
 
@@ -43,7 +43,7 @@ class EmployeeHoursChartWidget extends ChartWidget
             'labels' => $rows->map(fn (array $row): string => (string) data_get($row, 'employee.name', 'Сотрудник'))->all(),
             'datasets' => [
                 [
-                    'label' => 'Часы',
+                    'label' => 'Отработано часов',
                     'data' => $rows->pluck('hours')->map(fn ($value) => (float) $value)->all(),
                     'backgroundColor' => [
                         'rgba(59, 130, 246, 0.75)',

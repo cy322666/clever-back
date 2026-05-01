@@ -12,7 +12,7 @@ use Filament\Tables\Table;
 
 class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Поступления по контрагентам за период';
+    protected static ?string $heading = 'Поступления по клиентам за период';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -48,7 +48,7 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
         return parent::table($table)
             ->groups([
                 Group::make('counterparty')
-                    ->label('Контрагент')
+                    ->label('Клиент')
                     ->collapsible()
                     ->titlePrefixedWithLabel(false)
                     ->getTitleFromRecordUsing(fn (array $record): string => (string) $record['counterparty'])
@@ -80,7 +80,7 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
                 ->limit(90),
             TextColumn::make('value')->label('Выручка')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             SelectColumn::make('net_profit_percent')
-                ->label('Доля чистыми')
+                ->label('Доля прибыли')
                 ->options([
                     '30' => '30%',
                     '50' => '50%',
@@ -92,7 +92,7 @@ class FinanceTopClientsTableWidget extends ArrayRecordsTableWidget
 
                     return is_numeric($state) ? (string) (int) $state : '100';
                 }),
-            TextColumn::make('net_value')->label('Чистыми')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextColumn::make('net_value')->label('Прибыль')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
         ];
     }
 

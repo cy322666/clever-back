@@ -8,7 +8,7 @@ use Filament\Tables\Columns\TextColumn;
 
 class FinanceLowMarginClientsTableWidget extends ArrayRecordsTableWidget
 {
-    protected static ?string $heading = 'Низкая маржинальность';
+    protected static ?string $heading = 'Клиенты с низкой маржинальностью';
 
     protected int | string | array $columnSpan = 'full';
 
@@ -36,7 +36,7 @@ class FinanceLowMarginClientsTableWidget extends ArrayRecordsTableWidget
     {
         return [
             TextColumn::make('name')->label('Клиент')->wrap(),
-            TextColumn::make('margin_target')->label('Margin target')->formatStateUsing(fn ($state) => number_format(((float) $state) * 100, 1, ',', ' ') . '%'),
+            TextColumn::make('margin_target')->label('Целевая маржа')->formatStateUsing(fn ($state) => number_format(((float) $state) * 100, 1, ',', ' ') . '%'),
         ];
     }
 

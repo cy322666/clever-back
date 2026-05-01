@@ -10,7 +10,8 @@ class Companies extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
     protected static ?string $navigationLabel = 'Компании';
-    protected static ?int $navigationSort = 3;
+    protected static ?string $title = 'Компании';
+    protected static ?int $navigationSort = 5;
 
     protected function widgets(): array
     {

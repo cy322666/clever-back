@@ -10,7 +10,8 @@ class Finance extends AnalyticsPage
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
     protected static ?string $navigationLabel = 'Финансы';
-    protected static ?int $navigationSort = 6;
+    protected static ?string $title = 'Финансы';
+    protected static ?int $navigationSort = 3;
 
     protected function widgets(): array
     {

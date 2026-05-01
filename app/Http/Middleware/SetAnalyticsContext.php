@@ -18,16 +18,16 @@ class SetAnalyticsContext
         date_default_timezone_set($account->timezone ?? config('app.timezone'));
 
         View::share('analyticsNav', [
-            ['label' => 'Обзор', 'route' => 'dashboard', 'icon' => 'dashboard'],
+            ['label' => 'Главная', 'route' => 'dashboard', 'icon' => 'dashboard'],
             ['label' => 'Продажи', 'route' => 'sales', 'icon' => 'sales'],
-            ['label' => 'Товары', 'route' => 'products', 'icon' => 'products'],
+            ['label' => 'Услуги', 'route' => 'products', 'icon' => 'products'],
             ['label' => 'Счета', 'route' => 'invoices', 'icon' => 'finance'],
             ['label' => 'Компании', 'route' => 'clients', 'icon' => 'clients'],
             ['label' => 'Производство', 'route' => 'production', 'icon' => 'production'],
             ['label' => 'Финансы', 'route' => 'finance', 'icon' => 'finance'],
             ['label' => 'Риски', 'route' => 'risks', 'icon' => 'risks'],
-            ['label' => 'Источники', 'route' => 'integrations', 'icon' => 'integrations'],
-            ['label' => 'Ручной ввод', 'route' => 'manual-adjustments', 'icon' => 'manual'],
+            ['label' => 'Настройки', 'route' => 'integrations', 'icon' => 'integrations'],
+            ['label' => 'Справочники', 'route' => 'manual-adjustments', 'icon' => 'manual'],
         ]);
 
         return $next($request);

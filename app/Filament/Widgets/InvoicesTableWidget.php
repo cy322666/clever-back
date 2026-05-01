@@ -35,12 +35,12 @@ class InvoicesTableWidget extends ArrayRecordsTableWidget
     protected function getTableColumns(): array
     {
         return [
-            TextColumn::make('name')->label('Счет')->wrap()->searchable(),
+            TextColumn::make('name')->label('Счёт')->wrap()->searchable(),
             TextColumn::make('customer_name')->label('Клиент')->wrap()->searchable(),
-            TextColumn::make('category')->label('Группа')->badge()->placeholder('—'),
+            TextColumn::make('category')->label('Тип/категория')->badge()->placeholder('—'),
             TextColumn::make('amount')->label('Сумма')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             SelectColumn::make('payment_status')
-                ->label('Статус оплаты')
+                ->label('Статус')
                 ->options($this->paymentStatusOptions())
                 ->updateStateUsing(function ($state, array $record): string {
                     $this->updatePaymentStatus((int) $record['id'], (string) $state);
@@ -52,7 +52,7 @@ class InvoicesTableWidget extends ArrayRecordsTableWidget
                 ->label('')
                 ->icon('heroicon-m-arrow-top-right-on-square')
                 ->color(fn (?string $state) => filled($state) ? 'primary' : 'gray')
-                ->tooltip('Открыть счет')
+                ->tooltip('Открыть счёт')
                 ->url(fn (?string $state) => $state)
                 ->openUrlInNewTab(),
         ];

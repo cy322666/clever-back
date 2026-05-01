@@ -33,9 +33,9 @@ class CompaniesTableWidget extends ArrayRecordsTableWidget
         return [
             TextColumn::make('name')->label('Компания')->wrap(),
             TextColumn::make('deal_count')->label('Сделки')->sortable(),
-            TextColumn::make('won_count')->label('Продажи')->sortable(),
-            TextColumn::make('won_revenue')->label('Сумма продаж')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
-            TextColumn::make('win_rate')->label('Win rate')->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . '%'),
+            TextColumn::make('won_count')->label('Успешных продаж')->sortable(),
+            TextColumn::make('won_revenue')->label('Выручка')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextColumn::make('win_rate')->label('Конверсия')->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . '%'),
             TextColumn::make('segment')->label('Сегмент')->badge(),
             IconColumn::make('entity_url')
                 ->label('')

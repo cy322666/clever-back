@@ -448,7 +448,7 @@ class WeeekConnector
                         $this->employeeAttributes([
                             'name' => $displayName ?? $existingEmployee?->name ?? 'Weeek user '.$externalUserId,
                             'weeek_uuid' => $externalUserId,
-                            'role_title' => 'Production',
+                            'role_title' => 'Производство',
                             'is_active' => true,
                             'capacity_hours_per_week' => 40,
                             'weekly_limit_hours' => 40,
@@ -513,7 +513,7 @@ class WeeekConnector
             $this->employeeAttributes([
                 'name' => $name,
                 'weeek_uuid' => $externalUserId,
-                'role_title' => 'Production',
+                'role_title' => 'Производство',
                 'is_active' => true,
                 'capacity_hours_per_week' => 40,
                 'weekly_limit_hours' => 40,

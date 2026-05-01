@@ -158,11 +158,11 @@ class ProductionAnalyticsService extends AnalyticsService
 
         return [
             'kpis' => [
-                ['label' => 'Часы факт', 'value' => number_format($totalFactHours, 1, ',', ' '), 'hint' => 'По time entries', 'tone' => 'cyan', 'comparison' => $this->compareValues($totalFactHours, $previousTotalFactHours)],
-                ['label' => 'Стоимость часов', 'value' => number_format($totalEarned, 0, ',', ' ') . ' ₽', 'hint' => $this->moneyRateLabel($hourRate), 'tone' => 'emerald', 'comparison' => $this->compareValues($totalEarned, $previousTotalEarned)],
-                ['label' => 'ФОТ', 'value' => number_format($totalPayrollCost, 0, ',', ' ') . ' ₽', 'tone' => 'amber', 'comparison' => $this->compareValues($totalPayrollCost, $previousTotalPayrollCost), 'description' => ''],
-                ['label' => 'Маржа собственника', 'value' => number_format($totalOwnerProfit, 0, ',', ' ') . ' ₽', 'hint' => 'Часы × 3000 - зарплата', 'tone' => 'cyan', 'comparison' => $this->compareValues($totalOwnerProfit, $previousTotalOwnerProfit)],
-                ['label' => 'Перерасход проектов', 'value' => number_format($overrunHoursTotal, 1, ',', ' ') . ' ч', 'hint' => number_format($overrunProjectsCount) . ' проектов сверх плана', 'tone' => 'danger', 'comparison' => $this->compareValues($overrunHoursTotal, $previousOverrunHoursTotal)],
+                ['label' => 'Отработано часов', 'value' => number_format($totalFactHours, 1, ',', ' '), 'hint' => 'По учету времени', 'tone' => 'cyan', 'comparison' => $this->compareValues($totalFactHours, $previousTotalFactHours)],
+                ['label' => 'Стоимость отработанных часов', 'value' => number_format($totalEarned, 0, ',', ' ') . ' ₽', 'hint' => $this->moneyRateLabel($hourRate), 'tone' => 'emerald', 'comparison' => $this->compareValues($totalEarned, $previousTotalEarned)],
+                ['label' => 'Фонд оплаты труда', 'value' => number_format($totalPayrollCost, 0, ',', ' ') . ' ₽', 'tone' => 'amber', 'comparison' => $this->compareValues($totalPayrollCost, $previousTotalPayrollCost), 'description' => ''],
+                ['label' => 'Маржа после ФОТ', 'value' => number_format($totalOwnerProfit, 0, ',', ' ') . ' ₽', 'hint' => 'Часы × 3000 - зарплата', 'tone' => 'cyan', 'comparison' => $this->compareValues($totalOwnerProfit, $previousTotalOwnerProfit)],
+                ['label' => 'Перерасход по проектам', 'value' => number_format($overrunHoursTotal, 1, ',', ' ') . ' ч', 'hint' => number_format($overrunProjectsCount) . ' проектов сверх плана', 'tone' => 'danger', 'comparison' => $this->compareValues($overrunHoursTotal, $previousOverrunHoursTotal)],
             ],
             'charts' => [
                 'projects_by_stage' => $this->namedSeries($projectByStage),
