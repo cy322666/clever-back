@@ -276,6 +276,42 @@ class OwnerPulseAnalyticsService extends AnalyticsService
             }
         }
 
+        $finance = app(FinanceAnalyticsService::class)->build($period);
+        $financeRaw = $finance['cards_raw'] ?? [];
+        $unclassifiedCount = count($finance['unclassified_transactions'] ?? []);
+
+        if ($unclassifiedCount > 0) {
+            $rows->push($this->attentionRow('finance', 'Финансы', 'Есть неклассифицированные транзакции', $unclassifiedCount.' операций', 'Разобрать типы поступлений и расходов', null, 'medium', Finance::getUrl()));
+        }
+
+        $payroll = (float) ($financeRaw['payroll'] ?? 0);
+        $payrollPlan = (float) ($financeRaw['payroll_plan'] ?? 0);
+
+        if ($payrollPlan > 0 && $payroll > $payrollPlan * 1.05) {
+            $rows->push($this->attentionRow('finance', 'ФОТ', 'Расходы ФОТ выше плана', $this->money($payroll).' / '.$this->money($payrollPlan), 'Проверить зарплатные и подрядные платежи', null, 'medium', Finance::getUrl()));
+        }
+
+        $recurringShare = $financeRaw['recurring_share'] ?? null;
+        $previousRecurringShare = $financeRaw['previous_recurring_share'] ?? null;
+
+        if ($recurringShare !== null && $previousRecurringShare !== null && (float) $recurringShare < (float) $previousRecurringShare - 5) {
+            $rows->push($this->attentionRow('finance', 'Регулярная выручка', 'Доля регулярной выручки падает', $this->percent((float) $recurringShare).' было '.$this->percent((float) $previousRecurringShare), 'Проверить продления, сопровождение и лицензии', null, 'medium', Finance::getUrl()));
+        }
+
+        $revenue = (float) ($financeRaw['revenue'] ?? 0);
+        $previousRevenue = (float) ($financeRaw['previous_revenue'] ?? 0);
+        $expenses = (float) ($financeRaw['expenses'] ?? 0);
+        $previousExpenses = (float) ($financeRaw['previous_expenses'] ?? 0);
+
+        if ($previousRevenue > 0 && $previousExpenses > 0 && $expenses > 0) {
+            $revenueGrowth = (($revenue - $previousRevenue) / abs($previousRevenue)) * 100;
+            $expenseGrowth = (($expenses - $previousExpenses) / abs($previousExpenses)) * 100;
+
+            if ($expenseGrowth > $revenueGrowth + 10) {
+                $rows->push($this->attentionRow('finance', 'Расходы', 'Расходы растут быстрее выручки', $this->percent($expenseGrowth).' против '.$this->percent($revenueGrowth), 'Разобрать расходы по типам и сократить лишнее', null, 'medium', Finance::getUrl()));
+            }
+        }
+
         Buyer::query()
             ->with('client')
             ->where(function ($query) {
