@@ -818,7 +818,7 @@ class AmoCrmConnector
             $fields[] = [
                 'field_id' => $ltvFieldId,
                 'values' => [
-                    ['value' => (string) (int) round($metrics['ltv'])],
+                    ['value' => (string) (int) round($metrics['average_check'])],
                 ],
             ];
             $usedFieldIds[] = $ltvFieldId;
