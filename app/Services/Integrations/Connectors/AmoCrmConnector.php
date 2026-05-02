@@ -754,13 +754,23 @@ class AmoCrmConnector
     protected function shortCompanyName(string $name): string
     {
         $name = trim(preg_replace('/\s+/u', ' ', $name) ?: $name);
-        $replacements = [
-            'ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ' => 'ИП',
-            'ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ' => 'ООО',
-        ];
 
-        foreach ($replacements as $from => $to) {
-            $name = preg_replace('/'.preg_quote($from, '/').'/ui', $to, $name) ?: $name;
+        $name = preg_replace('/\s*\((?:ИП|ООО)\)\s*$/ui', '', $name) ?: $name;
+
+        if (preg_match('/^\s*индивидуальный\s+предприниматель\s+(.+)$/ui', $name, $matches)) {
+            return trim('ИП '.$matches[1]);
+        }
+
+        if (preg_match('/^\s*ип\s+(.+)$/ui', $name, $matches)) {
+            return trim('ИП '.$matches[1]);
+        }
+
+        if (preg_match('/^\s*общество\s+с\s+ограниченной\s+ответственностью\s+(.+)$/ui', $name, $matches)) {
+            return trim('ООО '.$matches[1]);
+        }
+
+        if (preg_match('/^\s*ооо\s+(.+)$/ui', $name, $matches)) {
+            return trim('ООО '.$matches[1]);
         }
 
         return trim(preg_replace('/\s+/u', ' ', $name) ?: $name);
@@ -800,6 +810,7 @@ class AmoCrmConnector
         $ltvFieldId = $this->companyLtvFieldId($settings);
         $salesAmountFieldId = $this->companySalesAmountFieldId($settings);
         $salesCountFieldId = $this->companySalesCountFieldId($settings);
+        $usedFieldIds = [];
 
         if ($ltvFieldId !== null) {
             $fields[] = [
@@ -808,18 +819,20 @@ class AmoCrmConnector
                     ['value' => (string) (int) round($metrics['ltv'])],
                 ],
             ];
+            $usedFieldIds[] = $ltvFieldId;
         }
 
-        if ($salesAmountFieldId !== null) {
+        if ($salesAmountFieldId !== null && ! in_array($salesAmountFieldId, $usedFieldIds, true)) {
             $fields[] = [
                 'field_id' => $salesAmountFieldId,
                 'values' => [
                     ['value' => (string) (int) round($metrics['ltv'])],
                 ],
             ];
+            $usedFieldIds[] = $salesAmountFieldId;
         }
 
-        if ($salesCountFieldId !== null) {
+        if ($salesCountFieldId !== null && ! in_array($salesCountFieldId, $usedFieldIds, true)) {
             $fields[] = [
                 'field_id' => $salesCountFieldId,
                 'values' => [
