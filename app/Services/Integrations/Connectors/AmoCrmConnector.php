@@ -544,6 +544,10 @@ class AmoCrmConnector
                     $stats['tagged']++;
                 }
 
+                $displayName = $this->shortCompanyName((string) ($client->legal_name ?: $client->name));
+
+                $this->updateAmoCompanyName($settings, $companyId, $displayName);
+
                 if ($this->updateAmoCompanyMetrics($settings, $companyId, $client, $clientMetrics[$client->id] ?? null)) {
                     $stats['metrics_updated']++;
                 }
@@ -551,7 +555,7 @@ class AmoCrmConnector
                 $client->forceFill([
                     'source_type' => 'amo_company',
                     'external_id' => $companyId,
-                    'name' => trim((string) data_get($amoCompany, 'name', $client->name)) ?: $client->name,
+                    'name' => $displayName,
                     'legal_name' => $client->legal_name ?: $client->name,
                     'inn' => $inn,
                     'category' => 'company',
@@ -683,7 +687,7 @@ class AmoCrmConnector
         }
 
         $company = [
-            'name' => $client->legal_name ?: $client->name ?: 'Компания '.$inn,
+            'name' => $this->shortCompanyName((string) ($client->legal_name ?: $client->name ?: 'Компания '.$inn)),
         ];
         $innFieldId = $this->companyInnFieldId($settings);
 
@@ -720,6 +724,45 @@ class AmoCrmConnector
         }
 
         return $created;
+    }
+
+    protected function updateAmoCompanyName(array $settings, string $companyId, string $name): bool
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+        $name = trim($name);
+
+        if ($baseUrl === '' || $token === '' || $companyId === '' || $name === '') {
+            return false;
+        }
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->patch($baseUrl.'/api/v4/companies/'.$companyId, [
+                'name' => $name,
+            ]);
+
+        $response->throw();
+
+        return true;
+    }
+
+    protected function shortCompanyName(string $name): string
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?: $name);
+        $replacements = [
+            'ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ' => 'ИП',
+            'ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ' => 'ООО',
+        ];
+
+        foreach ($replacements as $from => $to) {
+            $name = preg_replace('/\b'.preg_quote($from, '/').'\b/ui', $to, $name) ?: $name;
+        }
+
+        return trim(preg_replace('/\s+/u', ' ', $name) ?: $name);
     }
 
     protected function updateAmoCompanyMetrics(array $settings, string $companyId, Client $client, ?array $metrics = null): bool
