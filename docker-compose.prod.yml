@@ -1,3 +1,12 @@
+x-app-volumes: &app-volumes
+  - ./app:/var/www/html/app
+  - ./bootstrap/app.php:/var/www/html/bootstrap/app.php
+  - ./config:/var/www/html/config
+  - ./database:/var/www/html/database
+  - ./routes:/var/www/html/routes
+  - ./resources:/var/www/html/resources
+  - ./artisan:/var/www/html/artisan
+
 services:
   app:
     build:
@@ -5,10 +14,7 @@ services:
       target: app
     image: owner-analytics-app:prod
     command: >
-      sh -lc "if [ ! -f vendor/autoload.php ] || [ ! -f vendor/symfony/deprecation-contracts/function.php ];
-      then composer install --no-dev --no-interaction --no-scripts --prefer-dist --ignore-platform-req=ext-gd --ignore-platform-req=ext-intl;
-      fi;
-      php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
+      sh -lc "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
     ports:
       - "8000:8000"
     env_file:
@@ -16,21 +22,20 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+    volumes: *app-volumes
     depends_on:
       - postgres
 
   scheduler:
     image: owner-analytics-app:prod
     command: >
-      sh -lc "if [ ! -f vendor/autoload.php ] || [ ! -f vendor/symfony/deprecation-contracts/function.php ];
-      then composer install --no-dev --no-interaction --no-scripts --prefer-dist --ignore-platform-req=ext-gd --ignore-platform-req=ext-intl;
-      fi;
-      php artisan schedule:work"
+      sh -lc "php artisan schedule:work"
     env_file:
       - .env
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+    volumes: *app-volumes
     depends_on:
       - postgres
 
