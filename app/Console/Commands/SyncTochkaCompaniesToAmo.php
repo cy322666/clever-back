@@ -60,14 +60,20 @@ class SyncTochkaCompaniesToAmo extends Command
             ));
 
             $this->info('Синхронизирую компании в amoCRM по ИНН и ставлю тег "'.$tag.'"...');
-            $amoStats = $amo->syncClientsToAmoByInn($amoConnection, $clients, $tag);
+            $amoStats = $amo->syncClientsToAmoByInn(
+                $amoConnection,
+                $clients,
+                $tag,
+                clientMetrics: $tochkaStats['client_metrics'] ?? [],
+            );
 
             $this->line(sprintf(
-                'amoCRM: обработано %d, создано %d, найдено/обновлено %d, тег поставлен %d, пропущено %d.',
+                'amoCRM: обработано %d, создано %d, найдено/обновлено %d, тег поставлен %d, поля LTV/продаж обновлены %d, пропущено %d.',
                 $amoStats['pulled'],
                 $amoStats['created'],
                 $amoStats['updated'],
                 $amoStats['tagged'],
+                $amoStats['metrics_updated'],
                 $amoStats['skipped'],
             ));
 

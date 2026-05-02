@@ -17,6 +17,10 @@ return [
         'invoice_items_field_id' => env('AMO_INVOICE_ITEMS_FIELD_ID', 169939),
         'company_inn_field_id' => env('AMO_COMPANY_INN_FIELD_ID'),
         'company_inn_field_name' => env('AMO_COMPANY_INN_FIELD_NAME', 'ИНН'),
+        'company_ltv_field_id' => env('AMO_COMPANY_LTV_FIELD_ID'),
+        'company_ltv_field_name' => env('AMO_COMPANY_LTV_FIELD_NAME', 'LTV'),
+        'company_sales_count_field_id' => env('AMO_COMPANY_SALES_COUNT_FIELD_ID'),
+        'company_sales_count_field_name' => env('AMO_COMPANY_SALES_COUNT_FIELD_NAME', 'Количество продаж'),
         'sync_invoices' => env('AMO_SYNC_INVOICES', false),
     ],
     'weeek' => [

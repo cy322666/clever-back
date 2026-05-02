@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\EntityProduct;
 use App\Models\Invoice;
 use App\Models\Pipeline;
+use App\Models\RevenueTransaction;
 use App\Models\SalesLead;
 use App\Models\SalesOpportunity;
 use App\Models\SourceConnection;
@@ -28,6 +29,8 @@ class AmoCrmConnector
     protected array $catalogElementCache = [];
     protected array $catalogListCache = [];
     protected ?int $companyInnFieldId = null;
+    protected ?int $companyLtvFieldId = null;
+    protected ?int $companySalesCountFieldId = null;
     protected array $pipelineCache = [];
     protected array $stageCache = [];
 
@@ -488,9 +491,9 @@ class AmoCrmConnector
 
     /**
      * @param  iterable<Client>  $clients
-     * @return array{pulled:int, created:int, updated:int, skipped:int, tagged:int, warnings:array<int, string>}
+     * @return array{pulled:int, created:int, updated:int, skipped:int, tagged:int, metrics_updated:int, warnings:array<int, string>}
      */
-    public function syncClientsToAmoByInn(SourceConnection $connection, iterable $clients, string $tagName = 'Точка', bool $dryRun = false): array
+    public function syncClientsToAmoByInn(SourceConnection $connection, iterable $clients, string $tagName = 'Точка', bool $dryRun = false, array $clientMetrics = []): array
     {
         $settings = $this->resolveSettings($connection);
 
@@ -498,7 +501,7 @@ class AmoCrmConnector
             throw new \RuntimeException('amoCRM is not configured');
         }
 
-        $stats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'tagged' => 0, 'warnings' => []];
+        $stats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'tagged' => 0, 'metrics_updated' => 0, 'warnings' => []];
 
         foreach ($clients as $client) {
             if (! $client instanceof Client) {
@@ -524,7 +527,7 @@ class AmoCrmConnector
                         continue;
                     }
 
-                    $amoCompany = $this->createAmoCompanyFromClient($settings, $client, $inn);
+                    $amoCompany = $this->createAmoCompanyFromClient($settings, $client, $inn, $clientMetrics[$client->id] ?? null);
                     $createdInAmo = true;
                 } elseif ($dryRun) {
                     $stats['updated']++;
@@ -539,6 +542,10 @@ class AmoCrmConnector
 
                 if ($this->ensureAmoCompanyTag($settings, $companyId, $tagName)) {
                     $stats['tagged']++;
+                }
+
+                if ($this->updateAmoCompanyMetrics($settings, $companyId, $client, $clientMetrics[$client->id] ?? null)) {
+                    $stats['metrics_updated']++;
                 }
 
                 $client->forceFill([
@@ -666,7 +673,7 @@ class AmoCrmConnector
         return null;
     }
 
-    protected function createAmoCompanyFromClient(array $settings, Client $client, string $inn): array
+    protected function createAmoCompanyFromClient(array $settings, Client $client, string $inn, ?array $metrics = null): array
     {
         $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
         $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
@@ -692,6 +699,10 @@ class AmoCrmConnector
                 ],
             ],
         ];
+        $company['custom_fields_values'] = array_merge(
+            $company['custom_fields_values'],
+            $this->companyMetricFieldValues($settings, $client, $metrics),
+        );
 
         $response = Http::withToken($token)
             ->acceptJson()
@@ -709,6 +720,84 @@ class AmoCrmConnector
         }
 
         return $created;
+    }
+
+    protected function updateAmoCompanyMetrics(array $settings, string $companyId, Client $client, ?array $metrics = null): bool
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+        $fieldValues = $this->companyMetricFieldValues($settings, $client, $metrics);
+
+        if ($baseUrl === '' || $token === '' || $companyId === '' || $fieldValues === []) {
+            return false;
+        }
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->patch($baseUrl.'/api/v4/companies/'.$companyId, [
+                'custom_fields_values' => $fieldValues,
+            ]);
+
+        $response->throw();
+
+        return true;
+    }
+
+    /**
+     * @return array<int, array{field_id:int, values:array<int, array{value:int|float}>}>
+     */
+    protected function companyMetricFieldValues(array $settings, Client $client, ?array $metrics = null): array
+    {
+        $metrics = $this->companyMetrics($client, $metrics);
+        $fields = [];
+        $ltvFieldId = $this->companyLtvFieldId($settings);
+        $salesCountFieldId = $this->companySalesCountFieldId($settings);
+
+        if ($ltvFieldId !== null) {
+            $fields[] = [
+                'field_id' => $ltvFieldId,
+                'values' => [
+                    ['value' => round($metrics['ltv'], 2)],
+                ],
+            ];
+        }
+
+        if ($salesCountFieldId !== null) {
+            $fields[] = [
+                'field_id' => $salesCountFieldId,
+                'values' => [
+                    ['value' => $metrics['sales_count']],
+                ],
+            ];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @return array{ltv:float, sales_count:int}
+     */
+    protected function companyMetrics(Client $client, ?array $metrics = null): array
+    {
+        if (is_array($metrics)) {
+            return [
+                'ltv' => (float) ($metrics['ltv'] ?? 0),
+                'sales_count' => (int) ($metrics['sales_count'] ?? 0),
+            ];
+        }
+
+        $row = RevenueTransaction::query()
+            ->where('client_id', $client->id)
+            ->selectRaw('coalesce(sum(amount), 0) as ltv, count(*) as sales_count')
+            ->first();
+
+        return [
+            'ltv' => (float) ($row?->ltv ?? 0),
+            'sales_count' => (int) ($row?->sales_count ?? 0),
+        ];
     }
 
     protected function ensureAmoCompanyTag(array $settings, string $companyId, string $tagName): bool
@@ -786,6 +875,87 @@ class AmoCrmConnector
                 $id = (int) data_get($field, 'id', data_get($field, 'field_id', 0));
 
                 return $this->companyInnFieldId = $id > 0 ? $id : null;
+            }
+        }
+
+        return null;
+    }
+
+    protected function companyLtvFieldId(array $settings): ?int
+    {
+        if ($this->companyLtvFieldId !== null) {
+            return $this->companyLtvFieldId;
+        }
+
+        $configured = (int) ($settings['company_ltv_field_id'] ?? config('services.amo.company_ltv_field_id'));
+
+        if ($configured > 0) {
+            return $this->companyLtvFieldId = $configured;
+        }
+
+        return $this->companyLtvFieldId = $this->findAmoCompanyCustomFieldId($settings, [
+            (string) ($settings['company_ltv_field_name'] ?? config('services.amo.company_ltv_field_name', 'LTV')),
+            'LTV',
+            'ЛТВ',
+            'Выручка',
+            'Сумма продаж',
+        ], ['ltv']);
+    }
+
+    protected function companySalesCountFieldId(array $settings): ?int
+    {
+        if ($this->companySalesCountFieldId !== null) {
+            return $this->companySalesCountFieldId;
+        }
+
+        $configured = (int) ($settings['company_sales_count_field_id'] ?? config('services.amo.company_sales_count_field_id'));
+
+        if ($configured > 0) {
+            return $this->companySalesCountFieldId = $configured;
+        }
+
+        return $this->companySalesCountFieldId = $this->findAmoCompanyCustomFieldId($settings, [
+            (string) ($settings['company_sales_count_field_name'] ?? config('services.amo.company_sales_count_field_name', 'Количество продаж')),
+            'Количество продаж',
+            'Кол-во продаж',
+            'Продаж',
+            'Количество оплат',
+            'Оплат',
+        ], ['sales_count', 'purchases_count', 'payments_count']);
+    }
+
+    /**
+     * @param  array<int, string>  $names
+     * @param  array<int, string>  $codes
+     */
+    protected function findAmoCompanyCustomFieldId(array $settings, array $names, array $codes = []): ?int
+    {
+        $payload = $this->fetchAmoEntity($settings, '/api/v4/companies/custom_fields');
+        $fields = data_get($payload, '_embedded.custom_fields', []);
+
+        if (! is_array($fields)) {
+            return null;
+        }
+
+        $names = collect($names)
+            ->map(fn (string $name): string => Str::lower(trim($name)))
+            ->filter()
+            ->unique()
+            ->values();
+        $codes = collect($codes)
+            ->map(fn (string $code): string => Str::lower(trim($code)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($fields as $field) {
+            $name = Str::lower((string) data_get($field, 'name', data_get($field, 'field_name', '')));
+            $code = Str::lower((string) data_get($field, 'code', data_get($field, 'field_code', '')));
+
+            if ($names->contains($name) || $codes->contains($code)) {
+                $id = (int) data_get($field, 'id', data_get($field, 'field_id', 0));
+
+                return $id > 0 ? $id : null;
             }
         }
 

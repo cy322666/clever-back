@@ -131,7 +131,7 @@ class TochkaBankConnector implements SourceConnector
     /**
      * Pull counterparties from Tochka statements without changing finance rows.
      *
-     * @return array{pulled:int, created:int, updated:int, skipped:int, clients:\Illuminate\Support\Collection<int, Client>, account_id:string, statement_id:mixed}
+     * @return array{pulled:int, created:int, updated:int, skipped:int, clients:\Illuminate\Support\Collection<int, Client>, client_metrics:array<int, array{ltv:float, sales_count:int}>, account_id:string, statement_id:mixed}
      */
     public function syncCounterparties(SourceConnection $connection, CarbonImmutable $from, CarbonImmutable $to): array
     {
@@ -158,6 +158,7 @@ class TochkaBankConnector implements SourceConnector
         $updated = 0;
         $skipped = 0;
         $clients = collect();
+        $clientMetrics = [];
 
         foreach ($this->extractAllTransactions($statement) as $transaction) {
             $normalized = $this->normalizeTransaction($transaction, $statement, $connection->source_key);
@@ -176,6 +177,12 @@ class TochkaBankConnector implements SourceConnector
 
             $client->wasRecentlyCreated ? $created++ : $updated++;
             $clients->put((string) $client->id, $client);
+
+            if ($normalized['direction'] === 'in') {
+                $clientMetrics[$client->id] ??= ['ltv' => 0.0, 'sales_count' => 0];
+                $clientMetrics[$client->id]['ltv'] += (float) $normalized['amount'];
+                $clientMetrics[$client->id]['sales_count']++;
+            }
         }
 
         return [
@@ -184,6 +191,7 @@ class TochkaBankConnector implements SourceConnector
             'updated' => $updated,
             'skipped' => $skipped,
             'clients' => $clients->values(),
+            'client_metrics' => $clientMetrics,
             'account_id' => $accountId,
             'statement_id' => $statement['statementId'] ?? null,
         ];
