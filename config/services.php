@@ -21,6 +21,8 @@ return [
         'company_ltv_field_name' => env('AMO_COMPANY_LTV_FIELD_NAME', 'LTV'),
         'company_sales_amount_field_id' => env('AMO_COMPANY_SALES_AMOUNT_FIELD_ID'),
         'company_sales_amount_field_name' => env('AMO_COMPANY_SALES_AMOUNT_FIELD_NAME', 'Сумма продаж'),
+        'company_average_check_field_id' => env('AMO_COMPANY_AVERAGE_CHECK_FIELD_ID'),
+        'company_average_check_field_name' => env('AMO_COMPANY_AVERAGE_CHECK_FIELD_NAME', 'Средний чек'),
         'company_sales_count_field_id' => env('AMO_COMPANY_SALES_COUNT_FIELD_ID'),
         'company_sales_count_field_name' => env('AMO_COMPANY_SALES_COUNT_FIELD_NAME', 'Количество продаж'),
         'sync_invoices' => env('AMO_SYNC_INVOICES', false),

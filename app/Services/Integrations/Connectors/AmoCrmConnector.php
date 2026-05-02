@@ -31,6 +31,7 @@ class AmoCrmConnector
     protected ?int $companyInnFieldId = null;
     protected ?int $companyLtvFieldId = null;
     protected ?int $companySalesAmountFieldId = null;
+    protected ?int $companyAverageCheckFieldId = null;
     protected ?int $companySalesCountFieldId = null;
     protected array $pipelineCache = [];
     protected array $stageCache = [];
@@ -809,6 +810,7 @@ class AmoCrmConnector
         $fields = [];
         $ltvFieldId = $this->companyLtvFieldId($settings);
         $salesAmountFieldId = $this->companySalesAmountFieldId($settings);
+        $averageCheckFieldId = $this->companyAverageCheckFieldId($settings);
         $salesCountFieldId = $this->companySalesCountFieldId($settings);
         $usedFieldIds = [];
 
@@ -839,20 +841,34 @@ class AmoCrmConnector
                     ['value' => (string) $metrics['sales_count']],
                 ],
             ];
+            $usedFieldIds[] = $salesCountFieldId;
+        }
+
+        if ($averageCheckFieldId !== null && ! in_array($averageCheckFieldId, $usedFieldIds, true)) {
+            $fields[] = [
+                'field_id' => $averageCheckFieldId,
+                'values' => [
+                    ['value' => (string) (int) round($metrics['average_check'])],
+                ],
+            ];
         }
 
         return $fields;
     }
 
     /**
-     * @return array{ltv:float, sales_count:int}
+     * @return array{ltv:float, sales_count:int, average_check:float}
      */
     protected function companyMetrics(Client $client, ?array $metrics = null): array
     {
         if (is_array($metrics)) {
+            $ltv = (float) ($metrics['ltv'] ?? 0);
+            $salesCount = (int) ($metrics['sales_count'] ?? 0);
+
             return [
-                'ltv' => (float) ($metrics['ltv'] ?? 0),
-                'sales_count' => (int) ($metrics['sales_count'] ?? 0),
+                'ltv' => $ltv,
+                'sales_count' => $salesCount,
+                'average_check' => $salesCount > 0 ? $ltv / $salesCount : 0,
             ];
         }
 
@@ -864,6 +880,7 @@ class AmoCrmConnector
         return [
             'ltv' => (float) ($row?->ltv ?? 0),
             'sales_count' => (int) ($row?->sales_count ?? 0),
+            'average_check' => (int) ($row?->sales_count ?? 0) > 0 ? (float) ($row?->ltv ?? 0) / (int) ($row?->sales_count ?? 0) : 0,
         ];
     }
 
@@ -1008,6 +1025,27 @@ class AmoCrmConnector
             'Количество оплат',
             'Оплат',
         ], ['sales_count', 'purchases_count', 'payments_count']);
+    }
+
+    protected function companyAverageCheckFieldId(array $settings): ?int
+    {
+        if ($this->companyAverageCheckFieldId !== null) {
+            return $this->companyAverageCheckFieldId;
+        }
+
+        $configured = (int) ($settings['company_average_check_field_id'] ?? config('services.amo.company_average_check_field_id'));
+
+        if ($configured > 0) {
+            return $this->companyAverageCheckFieldId = $configured;
+        }
+
+        return $this->companyAverageCheckFieldId = $this->findAmoCompanyCustomFieldId($settings, [
+            (string) ($settings['company_average_check_field_name'] ?? config('services.amo.company_average_check_field_name', 'Средний чек')),
+            'Средний чек',
+            'Средняя продажа',
+            'Средняя сумма продажи',
+            'Средняя сумма оплаты',
+        ], ['average_check', 'avg_check', 'average_sale', 'avg_sale']);
     }
 
     /**
