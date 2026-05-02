@@ -747,7 +747,7 @@ class AmoCrmConnector
     }
 
     /**
-     * @return array<int, array{field_id:int, values:array<int, array{value:int|float}>}>
+     * @return array<int, array{field_id:int, values:array<int, array{value:string}>}>
      */
     protected function companyMetricFieldValues(array $settings, Client $client, ?array $metrics = null): array
     {
@@ -760,7 +760,7 @@ class AmoCrmConnector
             $fields[] = [
                 'field_id' => $ltvFieldId,
                 'values' => [
-                    ['value' => round($metrics['ltv'], 2)],
+                    ['value' => (string) (int) round($metrics['ltv'])],
                 ],
             ];
         }
@@ -769,7 +769,7 @@ class AmoCrmConnector
             $fields[] = [
                 'field_id' => $salesCountFieldId,
                 'values' => [
-                    ['value' => $metrics['sales_count']],
+                    ['value' => (string) $metrics['sales_count']],
                 ],
             ];
         }
