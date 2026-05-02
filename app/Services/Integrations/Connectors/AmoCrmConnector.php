@@ -30,6 +30,7 @@ class AmoCrmConnector
     protected array $catalogListCache = [];
     protected ?int $companyInnFieldId = null;
     protected ?int $companyLtvFieldId = null;
+    protected ?int $companySalesAmountFieldId = null;
     protected ?int $companySalesCountFieldId = null;
     protected array $pipelineCache = [];
     protected array $stageCache = [];
@@ -759,7 +760,7 @@ class AmoCrmConnector
         ];
 
         foreach ($replacements as $from => $to) {
-            $name = preg_replace('/\b'.preg_quote($from, '/').'\b/ui', $to, $name) ?: $name;
+            $name = preg_replace('/'.preg_quote($from, '/').'/ui', $to, $name) ?: $name;
         }
 
         return trim(preg_replace('/\s+/u', ' ', $name) ?: $name);
@@ -797,11 +798,21 @@ class AmoCrmConnector
         $metrics = $this->companyMetrics($client, $metrics);
         $fields = [];
         $ltvFieldId = $this->companyLtvFieldId($settings);
+        $salesAmountFieldId = $this->companySalesAmountFieldId($settings);
         $salesCountFieldId = $this->companySalesCountFieldId($settings);
 
         if ($ltvFieldId !== null) {
             $fields[] = [
                 'field_id' => $ltvFieldId,
+                'values' => [
+                    ['value' => (string) (int) round($metrics['ltv'])],
+                ],
+            ];
+        }
+
+        if ($salesAmountFieldId !== null) {
+            $fields[] = [
+                'field_id' => $salesAmountFieldId,
                 'values' => [
                     ['value' => (string) (int) round($metrics['ltv'])],
                 ],
@@ -940,9 +951,28 @@ class AmoCrmConnector
             (string) ($settings['company_ltv_field_name'] ?? config('services.amo.company_ltv_field_name', 'LTV')),
             'LTV',
             'ЛТВ',
-            'Выручка',
-            'Сумма продаж',
         ], ['ltv']);
+    }
+
+    protected function companySalesAmountFieldId(array $settings): ?int
+    {
+        if ($this->companySalesAmountFieldId !== null) {
+            return $this->companySalesAmountFieldId;
+        }
+
+        $configured = (int) ($settings['company_sales_amount_field_id'] ?? config('services.amo.company_sales_amount_field_id'));
+
+        if ($configured > 0) {
+            return $this->companySalesAmountFieldId = $configured;
+        }
+
+        return $this->companySalesAmountFieldId = $this->findAmoCompanyCustomFieldId($settings, [
+            (string) ($settings['company_sales_amount_field_name'] ?? config('services.amo.company_sales_amount_field_name', 'Сумма продаж')),
+            'Сумма продаж',
+            'Выручка',
+            'Сумма оплат',
+            'Оплачено',
+        ], ['sales_amount', 'sales_sum', 'revenue_amount', 'payments_amount']);
     }
 
     protected function companySalesCountFieldId(array $settings): ?int
