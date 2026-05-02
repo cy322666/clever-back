@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Client;
-use App\Models\RevenueTransaction;
+use App\Models\BankStatementRow;
 use App\Models\SourceConnection;
 use App\Services\Integrations\Connectors\AmoCrmConnector;
 use App\Services\Integrations\Connectors\TochkaBankConnector;
@@ -144,20 +144,101 @@ class SyncTochkaCompaniesToAmo extends Command
             ->orderBy('name')
             ->get();
 
-        $metrics = RevenueTransaction::query()
-            ->whereNotNull('client_id')
-            ->whereBetween('posted_at', [$from, $to])
-            ->selectRaw('client_id, coalesce(sum(amount), 0) as ltv, count(*) as sales_count')
-            ->groupBy('client_id')
-            ->get()
-            ->mapWithKeys(fn ($row): array => [
-                (int) $row->client_id => [
-                    'ltv' => (float) $row->ltv,
-                    'sales_count' => (int) $row->sales_count,
-                ],
-            ])
-            ->all();
+        $clientsByInn = $clients
+            ->mapWithKeys(fn (Client $client): array => [$this->normalizeInn($client->inn) => $client])
+            ->filter(fn (?Client $client, ?string $inn): bool => filled($inn) && $client !== null);
+
+        $metrics = [];
+
+        BankStatementRow::query()
+            ->where('source_key', 'tochka')
+            ->where('direction', 'in')
+            ->whereBetween('occurred_at', [$from, $to])
+            ->orderBy('id')
+            ->get(['id', 'amount', 'direction', 'raw_payload'])
+            ->each(function (BankStatementRow $row) use (&$metrics, $clientsByInn): void {
+                $inn = $this->counterpartyInnFromBankRow($row);
+                $client = $inn !== null ? $clientsByInn->get($inn) : null;
+
+                if (! $client) {
+                    return;
+                }
+
+                $metrics[$client->id] ??= ['ltv' => 0.0, 'sales_count' => 0];
+                $metrics[$client->id]['ltv'] += (float) $row->amount;
+                $metrics[$client->id]['sales_count']++;
+            });
 
         return [$clients, $metrics];
+    }
+
+    private function counterpartyInnFromBankRow(BankStatementRow $row): ?string
+    {
+        $payload = is_array($row->raw_payload) ? $row->raw_payload : [];
+        $party = data_get($payload, 'DebtorParty', []);
+
+        return $this->normalizeInn($this->findValueByKeys(is_array($party) ? $party : [], [
+            'inn',
+            'инн',
+            'innkio',
+            'taxid',
+            'tax_id',
+            'taxnumber',
+            'tax_number',
+            'taxidentificationnumber',
+            'tax_identification_number',
+            'payerinn',
+            'payer_inn',
+            'recipientinn',
+            'recipient_inn',
+            'counterpartyinn',
+            'counterparty_inn',
+            'debtorinn',
+            'debtor_inn',
+            'creditorinn',
+            'creditor_inn',
+        ]));
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    private function findValueByKeys(mixed $payload, array $keys): mixed
+    {
+        if (! is_array($payload)) {
+            return null;
+        }
+
+        $normalizedKeys = collect($keys)
+            ->map(fn (string $key): string => $this->normalizeKey($key))
+            ->all();
+
+        foreach ($payload as $key => $value) {
+            if (in_array($this->normalizeKey((string) $key), $normalizedKeys, true)) {
+                return $value;
+            }
+
+            if (is_array($value)) {
+                $nested = $this->findValueByKeys($value, $keys);
+
+                if ($nested !== null && $nested !== '') {
+                    return $nested;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeKey(string $key): string
+    {
+        return str_replace(['_', '-', ' '], '', mb_strtolower($key));
+    }
+
+    private function normalizeInn(mixed $value): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $value) ?: '';
+
+        return in_array(strlen($digits), [10, 12], true) ? $digits : null;
     }
 }
