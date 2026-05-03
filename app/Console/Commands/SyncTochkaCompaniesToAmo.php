@@ -80,6 +80,8 @@ class SyncTochkaCompaniesToAmo extends Command
                 ));
             }
 
+            $clientMetrics = $this->prepareClientMetricsForAmo($clients, $clientMetrics);
+
             $this->info('Синхронизирую компании в amoCRM по ИНН и ставлю тег "'.$tag.'"...');
             $amoStats = $amo->syncClientsToAmoByInn(
                 $amoConnection,
@@ -240,6 +242,68 @@ class SyncTochkaCompaniesToAmo extends Command
             });
 
         return [$clients, $metrics];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Client>  $clients
+     * @param  array<int, array{ltv:float, sales_count:int, segment?:string}>  $metrics
+     * @return array<int, array{ltv:float, sales_count:int, segment:string}>
+     */
+    private function prepareClientMetricsForAmo($clients, array $metrics): array
+    {
+        foreach ($clients as $client) {
+            if (! $client instanceof Client) {
+                continue;
+            }
+
+            $metrics[$client->id] ??= ['ltv' => 0.0, 'sales_count' => 0];
+        }
+
+        return $this->applyAbcSegments($metrics);
+    }
+
+    /**
+     * @param  array<int, array{ltv:float, sales_count:int, segment?:string}>  $metrics
+     * @return array<int, array{ltv:float, sales_count:int, segment:string}>
+     */
+    private function applyAbcSegments(array $metrics): array
+    {
+        $totalRevenue = array_sum(array_map(
+            fn (array $metric): float => max(0.0, (float) ($metric['ltv'] ?? 0)),
+            $metrics,
+        ));
+
+        if ($totalRevenue <= 0) {
+            return array_map(function (array $metric): array {
+                $metric['segment'] = 'C';
+
+                return $metric;
+            }, $metrics);
+        }
+
+        $sortedClientIds = array_keys($metrics);
+        usort($sortedClientIds, fn (int $left, int $right): int => ((float) ($metrics[$right]['ltv'] ?? 0)) <=> ((float) ($metrics[$left]['ltv'] ?? 0)));
+
+        $cumulativeRevenue = 0.0;
+
+        foreach ($sortedClientIds as $clientId) {
+            $revenue = max(0.0, (float) ($metrics[$clientId]['ltv'] ?? 0));
+
+            if ($revenue <= 0) {
+                $metrics[$clientId]['segment'] = 'C';
+                continue;
+            }
+
+            $shareBefore = $cumulativeRevenue / $totalRevenue;
+            $metrics[$clientId]['segment'] = match (true) {
+                $shareBefore < 0.80 => 'A',
+                $shareBefore < 0.95 => 'B',
+                default => 'C',
+            };
+            $cumulativeRevenue += $revenue;
+        }
+
+        return $metrics;
     }
 
     private function counterpartyInnFromBankRow(BankStatementRow $row): ?string

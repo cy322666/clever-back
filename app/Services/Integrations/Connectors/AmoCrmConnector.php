@@ -33,6 +33,7 @@ class AmoCrmConnector
     protected ?int $companySalesAmountFieldId = null;
     protected ?int $companyAverageCheckFieldId = null;
     protected ?int $companySalesCountFieldId = null;
+    protected ?int $companySegmentFieldId = null;
     protected array $pipelineCache = [];
     protected array $stageCache = [];
 
@@ -812,6 +813,7 @@ class AmoCrmConnector
         $salesAmountFieldId = $this->companySalesAmountFieldId($settings);
         $averageCheckFieldId = $this->companyAverageCheckFieldId($settings);
         $salesCountFieldId = $this->companySalesCountFieldId($settings);
+        $segmentFieldId = $this->companySegmentFieldId($settings);
         $usedFieldIds = [];
 
         if ($ltvFieldId !== null) {
@@ -851,24 +853,36 @@ class AmoCrmConnector
                     ['value' => (string) (int) round($metrics['average_check'])],
                 ],
             ];
+            $usedFieldIds[] = $averageCheckFieldId;
+        }
+
+        if ($segmentFieldId !== null && ! in_array($segmentFieldId, $usedFieldIds, true)) {
+            $fields[] = [
+                'field_id' => $segmentFieldId,
+                'values' => [
+                    ['value' => (string) $metrics['segment']],
+                ],
+            ];
         }
 
         return $fields;
     }
 
     /**
-     * @return array{ltv:float, sales_count:int, average_check:float}
+     * @return array{ltv:float, sales_count:int, average_check:float, segment:string}
      */
     protected function companyMetrics(Client $client, ?array $metrics = null): array
     {
         if (is_array($metrics)) {
             $ltv = (float) ($metrics['ltv'] ?? 0);
             $salesCount = (int) ($metrics['sales_count'] ?? 0);
+            $segment = (string) ($metrics['segment'] ?? $this->companySegmentForRevenue($ltv));
 
             return [
                 'ltv' => $ltv,
                 'sales_count' => $salesCount,
                 'average_check' => $salesCount > 0 ? $ltv / $salesCount : 0,
+                'segment' => $segment,
             ];
         }
 
@@ -881,7 +895,25 @@ class AmoCrmConnector
             'ltv' => (float) ($row?->ltv ?? 0),
             'sales_count' => (int) ($row?->sales_count ?? 0),
             'average_check' => (int) ($row?->sales_count ?? 0) > 0 ? (float) ($row?->ltv ?? 0) / (int) ($row?->sales_count ?? 0) : 0,
+            'segment' => $this->companySegmentForRevenue((float) ($row?->ltv ?? 0)),
         ];
+    }
+
+    protected function companySegmentForRevenue(float $revenue): string
+    {
+        if ($revenue >= 500000) {
+            return 'A';
+        }
+
+        if ($revenue >= 100000) {
+            return 'B';
+        }
+
+        if ($revenue > 0) {
+            return 'C';
+        }
+
+        return 'C';
     }
 
     protected function ensureAmoCompanyTag(array $settings, string $companyId, string $tagName): bool
@@ -1046,6 +1078,27 @@ class AmoCrmConnector
             'Средняя сумма продажи',
             'Средняя сумма оплаты',
         ], ['average_check', 'avg_check', 'average_sale', 'avg_sale']);
+    }
+
+    protected function companySegmentFieldId(array $settings): ?int
+    {
+        if ($this->companySegmentFieldId !== null) {
+            return $this->companySegmentFieldId;
+        }
+
+        $configured = (int) ($settings['company_segment_field_id'] ?? config('services.amo.company_segment_field_id'));
+
+        if ($configured > 0) {
+            return $this->companySegmentFieldId = $configured;
+        }
+
+        return $this->companySegmentFieldId = $this->findAmoCompanyCustomFieldId($settings, [
+            (string) ($settings['company_segment_field_name'] ?? config('services.amo.company_segment_field_name', 'Сегмент')),
+            'Сегмент',
+            'ABC',
+            'ABC сегмент',
+            'Сегмент клиента',
+        ], ['segment', 'abc_segment', 'client_segment']);
     }
 
     /**

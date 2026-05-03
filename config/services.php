@@ -25,6 +25,8 @@ return [
         'company_average_check_field_name' => env('AMO_COMPANY_AVERAGE_CHECK_FIELD_NAME', 'Средний чек'),
         'company_sales_count_field_id' => env('AMO_COMPANY_SALES_COUNT_FIELD_ID'),
         'company_sales_count_field_name' => env('AMO_COMPANY_SALES_COUNT_FIELD_NAME', 'Количество продаж'),
+        'company_segment_field_id' => env('AMO_COMPANY_SEGMENT_FIELD_ID'),
+        'company_segment_field_name' => env('AMO_COMPANY_SEGMENT_FIELD_NAME', 'Сегмент'),
         'sync_invoices' => env('AMO_SYNC_INVOICES', false),
     ],
     'weeek' => [
