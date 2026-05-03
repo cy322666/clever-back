@@ -128,7 +128,10 @@ class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
         if ($employeeKey !== null) {
             $name = Employee::query()
                 ->where('weeek_uuid', $employeeKey)
-                ->value('name');
+                ->get(['name'])
+                ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
+                ->pluck('name')
+                ->first();
 
             if (filled($name)) {
                 return (string) $name;
@@ -138,9 +141,31 @@ class EmployeeProductionStatsWidget extends AnalyticsStatsOverviewWidget
         $name = Employee::query()
             ->whereNotNull('weeek_uuid')
             ->orderBy('name')
-            ->value('name') ?: 'Без сотрудника';
+            ->get(['name'])
+            ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
+            ->pluck('name')
+            ->first() ?: 'Без сотрудника';
 
         return (string) $name;
+    }
+
+    private function isExcludedProductionEmployee(string $name): bool
+    {
+        $normalizedName = mb_strtolower(trim($name));
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        foreach ((array) config('dashboard.production_excluded_employee_names', []) as $excludedName) {
+            $normalizedExcludedName = mb_strtolower(trim((string) $excludedName));
+
+            if ($normalizedExcludedName !== '' && str_contains($normalizedName, $normalizedExcludedName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resolveEmployeeKey(): ?string

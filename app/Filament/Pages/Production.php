@@ -39,13 +39,48 @@ class Production extends AnalyticsPage
         $employee = (string) request()->query('employee', '');
 
         if (filled($employee)) {
+            $isExcluded = Employee::query()
+                ->where('weeek_uuid', $employee)
+                ->get(['name'])
+                ->contains(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name));
+
+            if ($isExcluded) {
+                return $this->firstVisibleEmployeeUuid();
+            }
+
             return $employee;
         }
 
+        return $this->firstVisibleEmployeeUuid();
+    }
+
+    private function firstVisibleEmployeeUuid(): ?string
+    {
         return Employee::query()
             ->whereNotNull('weeek_uuid')
             ->orderBy('name')
+            ->get(['name', 'weeek_uuid'])
+            ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
             ->value('weeek_uuid');
+    }
+
+    private function isExcludedProductionEmployee(string $name): bool
+    {
+        $normalizedName = mb_strtolower(trim($name));
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        foreach ((array) config('dashboard.production_excluded_employee_names', []) as $excludedName) {
+            $normalizedExcludedName = mb_strtolower(trim((string) $excludedName));
+
+            if ($normalizedExcludedName !== '' && str_contains($normalizedName, $normalizedExcludedName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }

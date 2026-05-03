@@ -135,7 +135,10 @@ class EmployeeProductionChartWidget extends ChartWidget
         if ($employeeKey !== null) {
             $name = Employee::query()
                 ->where('weeek_uuid', $employeeKey)
-                ->value('name');
+                ->get(['name'])
+                ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
+                ->pluck('name')
+                ->first();
 
             if (filled($name)) {
                 return (string) $name;
@@ -145,7 +148,10 @@ class EmployeeProductionChartWidget extends ChartWidget
         $name = Employee::query()
             ->whereNotNull('weeek_uuid')
             ->orderBy('name')
-            ->value('name') ?: 'Без сотрудника';
+            ->get(['name'])
+            ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
+            ->pluck('name')
+            ->first() ?: 'Без сотрудника';
 
         return (string) $name;
     }
@@ -163,7 +169,10 @@ class EmployeeProductionChartWidget extends ChartWidget
         return Employee::query()
             ->whereNotNull('weeek_uuid')
             ->orderBy('name')
-            ->value('weeek_uuid');
+            ->get(['name', 'weeek_uuid'])
+            ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
+            ->pluck('weeek_uuid')
+            ->first();
     }
 
     /**
@@ -174,8 +183,29 @@ class EmployeeProductionChartWidget extends ChartWidget
         return Employee::query()
             ->whereNotNull('weeek_uuid')
             ->orderBy('name')
+            ->get(['name', 'weeek_uuid'])
+            ->reject(fn (Employee $employee): bool => $this->isExcludedProductionEmployee((string) $employee->name))
             ->pluck('name', 'weeek_uuid')
             ->all();
+    }
+
+    private function isExcludedProductionEmployee(string $name): bool
+    {
+        $normalizedName = mb_strtolower(trim($name));
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        foreach ((array) config('dashboard.production_excluded_employee_names', []) as $excludedName) {
+            $normalizedExcludedName = mb_strtolower(trim((string) $excludedName));
+
+            if ($normalizedExcludedName !== '' && str_contains($normalizedName, $normalizedExcludedName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function updatedFilter(): void

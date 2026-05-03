@@ -51,6 +51,7 @@ class ProductionAnalyticsService extends AnalyticsService
             ->whereNotNull('weeek_uuid')
             ->orderBy('name')
             ->get()
+            ->reject(fn ($row): bool => $this->isExcludedEmployeeName((string) $row->name))
             ->map(function ($row) {
                 return (object) [
                     'id' => (string) $row->worker_id,
@@ -84,6 +85,8 @@ class ProductionAnalyticsService extends AnalyticsService
         $salaryPayrollCost = Employee::query()
             ->where('is_active', true)
             ->whereNotNull('salary_amount')
+            ->get(['name', 'salary_amount'])
+            ->reject(fn (Employee $employee): bool => $this->isExcludedEmployeeName((string) $employee->name))
             ->sum('salary_amount');
         $projectTotalTimeHours = (float) $projectTimeRows->sum('hours');
         $projectFallbackHourlyCost = $projectTotalTimeHours > 0 ? $salaryPayrollCost / $projectTotalTimeHours : 0;
@@ -257,7 +260,9 @@ class ProductionAnalyticsService extends AnalyticsService
                 coalesce(task_projects_by_id.id, task_projects_by_external.id, 0),
                 coalesce(task_projects_by_id.name, task_projects_by_external.name, 'Без проекта')
             ")
-            ->get();
+            ->get()
+            ->reject(fn ($row): bool => $this->isExcludedEmployeeName((string) ($row->employee_name ?? '')))
+            ->values();
     }
 
     protected function mergeTimeEntryEmployees(Collection $employees, Collection $timeRows): Collection
@@ -543,6 +548,36 @@ class ProductionAnalyticsService extends AnalyticsService
         $colors = ['#6ba7ff', '#7fd4a3', '#d8b26d', '#e67c89', '#9986ff', '#68c7bf', '#c9a85b', '#89b9ff'];
 
         return $colors[$index % count($colors)];
+    }
+
+    protected function isExcludedEmployeeName(string $name): bool
+    {
+        $normalizedName = mb_strtolower(trim($name));
+
+        if ($normalizedName === '') {
+            return false;
+        }
+
+        foreach ($this->excludedEmployeeNames() as $excludedName) {
+            if (str_contains($normalizedName, $excludedName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function excludedEmployeeNames(): array
+    {
+        return collect(config('dashboard.production_excluded_employee_names', []))
+            ->map(fn ($name): string => mb_strtolower(trim((string) $name)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     protected function projectColor(int $index): string
