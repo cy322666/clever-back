@@ -4,12 +4,14 @@ namespace App\Console\Commands;
 
 use App\Models\Client;
 use App\Models\BankStatementRow;
+use App\Models\RevenueTransaction;
 use App\Models\SourceConnection;
 use App\Services\Integrations\Connectors\AmoCrmConnector;
 use App\Services\Integrations\Connectors\TochkaBankConnector;
 use App\Services\Integrations\SourceConnectionBootstrapper;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class SyncTochkaCompaniesToAmo extends Command
@@ -149,13 +151,54 @@ class SyncTochkaCompaniesToAmo extends Command
             ->filter(fn (?Client $client, ?string $inn): bool => filled($inn) && $client !== null);
 
         $metrics = [];
+        $clientIds = $clients->pluck('id')->all();
+
+        if ($clientIds !== []) {
+            RevenueTransaction::query()
+                ->leftJoin('bank_statement_rows', 'bank_statement_rows.id', '=', 'revenue_transactions.bank_statement_row_id')
+                ->leftJoin('data_import_batches', 'data_import_batches.id', '=', 'bank_statement_rows.data_import_batch_id')
+                ->whereIn('revenue_transactions.client_id', $clientIds)
+                ->whereBetween('revenue_transactions.transaction_date', [$from, $to])
+                ->where(function ($query): void {
+                    $query
+                        ->where('revenue_transactions.source_system', 'tochka')
+                        ->orWhere('bank_statement_rows.source_key', 'tochka')
+                        ->orWhere('data_import_batches.source_type', 'tochka');
+                })
+                ->groupBy('revenue_transactions.client_id')
+                ->get([
+                    DB::raw('revenue_transactions.client_id as client_id'),
+                    DB::raw('coalesce(sum(revenue_transactions.amount), 0) as ltv'),
+                    DB::raw('count(*) as sales_count'),
+                ])
+                ->each(function ($row) use (&$metrics): void {
+                    $clientId = (int) $row->client_id;
+
+                    $metrics[$clientId] = [
+                        'ltv' => (float) $row->ltv,
+                        'sales_count' => (int) $row->sales_count,
+                    ];
+                });
+        }
 
         BankStatementRow::query()
-            ->where('source_key', 'tochka')
-            ->where('direction', 'in')
-            ->whereBetween('occurred_at', [$from, $to])
-            ->orderBy('id')
-            ->get(['id', 'amount', 'direction', 'raw_payload'])
+            ->leftJoin('revenue_transactions', 'revenue_transactions.bank_statement_row_id', '=', 'bank_statement_rows.id')
+            ->leftJoin('data_import_batches', 'data_import_batches.id', '=', 'bank_statement_rows.data_import_batch_id')
+            ->whereNull('revenue_transactions.id')
+            ->where('bank_statement_rows.direction', 'in')
+            ->whereBetween('bank_statement_rows.occurred_at', [$from, $to])
+            ->where(function ($query): void {
+                $query
+                    ->where('bank_statement_rows.source_key', 'tochka')
+                    ->orWhere('data_import_batches.source_type', 'tochka');
+            })
+            ->orderBy('bank_statement_rows.id')
+            ->get([
+                'bank_statement_rows.id',
+                'bank_statement_rows.amount',
+                'bank_statement_rows.direction',
+                'bank_statement_rows.raw_payload',
+            ])
             ->each(function (BankStatementRow $row) use (&$metrics, $clientsByInn): void {
                 $inn = $this->counterpartyInnFromBankRow($row);
                 $client = $inn !== null ? $clientsByInn->get($inn) : null;
