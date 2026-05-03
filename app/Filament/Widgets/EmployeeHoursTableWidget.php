@@ -39,15 +39,6 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
             TextColumn::make('employee')
                 ->label('Сотрудник')
                 ->wrap(),
-            TextColumn::make('role')
-                ->label('Роль')
-                ->badge()
-                ->color(fn (array $record): string => ($record['is_owner'] ?? false) ? 'warning' : 'gray')
-                ->sortable(),
-            TextColumn::make('planned_hours')
-                ->label('План часов')
-                ->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . ' ч')
-                ->sortable(),
             TextColumn::make('fact_hours')
                 ->label('Факт часов')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . ' ч')
@@ -58,15 +49,19 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . '%')
                 ->color(fn ($state): string => (float) $state >= 95 ? 'danger' : ((float) $state >= 85 ? 'warning' : ((float) $state > 0 ? 'success' : 'gray')))
                 ->sortable(),
-            TextColumn::make('responsible_projects_count')
-                ->label('Ответственный за проектов')
-                ->numeric()
-                ->tooltip(fn (array $record): ?string => filled($record['responsible_projects'] ?? null) ? (string) $record['responsible_projects'] : null)
+            TextColumn::make('planned_hours')
+                ->label('План часов')
+                ->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . ' ч')
                 ->sortable(),
             TextColumn::make('active_projects')
                 ->label('Активных проектов')
                 ->numeric()
                 ->tooltip(fn (array $record): ?string => filled($record['active_project_names'] ?? null) ? (string) $record['active_project_names'] : null)
+                ->sortable(),
+            TextColumn::make('responsible_projects_count')
+                ->label('Ответственный за проектов')
+                ->numeric()
+                ->tooltip(fn (array $record): ?string => filled($record['responsible_projects'] ?? null) ? (string) $record['responsible_projects'] : null)
                 ->sortable(),
             TextColumn::make('red_projects_count')
                 ->label('Проекты в красной зоне')
@@ -74,12 +69,12 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                 ->color(fn ($state): string => (int) $state > 2 ? 'danger' : ((int) $state > 0 ? 'warning' : 'success'))
                 ->sortable(),
             TextColumn::make('overdue_tasks')->label('Просроченные задачи')->numeric()->sortable(),
-            TextColumn::make('earned')
-                ->label('Заработано по ставке 3000 ₽/ч')
-                ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
-                ->sortable(),
             TextColumn::make('owner_margin')
                 ->label('Маржа после ФОТ')
+                ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
+                ->sortable(),
+            TextColumn::make('earned')
+                ->label('Заработано по ставке 3000 ₽/ч')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
                 ->sortable(),
             TextColumn::make('status')
@@ -91,6 +86,11 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                     'Норма' => 'success',
                     default => 'gray',
                 })
+                ->sortable(),
+            TextColumn::make('role')
+                ->label('Роль')
+                ->badge()
+                ->color(fn (array $record): string => ($record['is_owner'] ?? false) ? 'warning' : 'gray')
                 ->sortable(),
         ];
     }

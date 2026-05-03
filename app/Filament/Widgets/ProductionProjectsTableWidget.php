@@ -122,6 +122,28 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
 
                     return (string) $state;
                 }),
+            TextColumn::make('hours_progress_pct')
+                ->label('% выработки')
+                ->badge()
+                ->formatStateUsing(fn ($state) => $state === null ? '—' : number_format((float) $state, 1, ',', ' ') . '%')
+                ->color(fn ($state) => $state !== null && (float) $state > 100 ? 'danger' : ((float) $state >= 90 ? 'warning' : 'success'))
+                ->sortable(),
+            TextColumn::make('overrun_hours')->label('Перерасход')->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . ' ч')->sortable(),
+            TextColumn::make('missed_profit')->label('Упущенная прибыль')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextInputColumn::make('planned_hours_total')
+                ->label('План')
+                ->type('number')
+                ->width('5rem')
+                ->extraAttributes(['style' => 'width: 5rem; min-width: 5rem; max-width: 5rem;'])
+                ->extraInputAttributes(['style' => 'width: 5rem; min-width: 0;'])
+                ->updateStateUsing(function ($state, array $record): ?float {
+                    $value = is_numeric($state) ? (float) $state : null;
+                    $this->updateProject((int) $record['project_id'], [
+                        'planned_hours' => $value,
+                    ]);
+
+                    return $value;
+                }),
             TextInputColumn::make('start_date')
                 ->label('Старт')
                 ->type('date')
@@ -146,30 +168,8 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
 
                     return $value;
                 }),
-            TextInputColumn::make('planned_hours_total')
-                ->label('План')
-                ->type('number')
-                ->width('5rem')
-                ->extraAttributes(['style' => 'width: 5rem; min-width: 5rem; max-width: 5rem;'])
-                ->extraInputAttributes(['style' => 'width: 5rem; min-width: 0;'])
-                ->updateStateUsing(function ($state, array $record): ?float {
-                    $value = is_numeric($state) ? (float) $state : null;
-                    $this->updateProject((int) $record['project_id'], [
-                        'planned_hours' => $value,
-                    ]);
-
-                    return $value;
-                }),
-            TextColumn::make('overrun_hours')->label('Перерасход')->formatStateUsing(fn ($state) => number_format((float) $state, 1, ',', ' ') . ' ч')->sortable(),
-            TextColumn::make('missed_profit')->label('Упущенная прибыль')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
-            TextColumn::make('hours_progress_pct')
-                ->label('% выработки')
-                ->badge()
-                ->formatStateUsing(fn ($state) => $state === null ? '—' : number_format((float) $state, 1, ',', ' ') . '%')
-                ->color(fn ($state) => $state !== null && (float) $state > 100 ? 'danger' : ((float) $state >= 90 ? 'warning' : 'success'))
-                ->sortable(),
-            TextColumn::make('salary_cost')->label('Фонд оплаты труда')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             TextColumn::make('owner_profit')->label('Маржа после ФОТ')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
+            TextColumn::make('salary_cost')->label('Фонд оплаты труда')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
         ];
     }
 
