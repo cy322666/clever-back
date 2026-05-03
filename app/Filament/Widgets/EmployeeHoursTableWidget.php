@@ -33,7 +33,20 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
         return app(OwnerPulseAnalyticsService::class)->build($this->resolvePeriod())['team_load'] ?? [];
     }
 
+    protected function getTableHeaderActions(): array
+    {
+        return [
+            $this->columnOrderAction('employee_hours', $this->baseTableColumns()),
+            $this->resetColumnOrderAction('employee_hours'),
+        ];
+    }
+
     protected function getTableColumns(): array
+    {
+        return $this->applyColumnOrder('employee_hours', $this->baseTableColumns());
+    }
+
+    protected function baseTableColumns(): array
     {
         return [
             TextColumn::make('employee')

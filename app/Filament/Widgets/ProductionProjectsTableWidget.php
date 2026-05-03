@@ -46,7 +46,11 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
 
     protected function getTableHeaderActions(): array
     {
+        $columns = $this->baseTableColumns();
+
         return [
+            $this->columnOrderAction('production_projects', $columns),
+            $this->resetColumnOrderAction('production_projects'),
             Action::make('allTypes')
                 ->label('Все типы')
                 ->button()
@@ -88,6 +92,11 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
     }
 
     protected function getTableColumns(): array
+    {
+        return $this->applyColumnOrder('production_projects', $this->baseTableColumns());
+    }
+
+    protected function baseTableColumns(): array
     {
         return [
             TextColumn::make('project_name')->label('Проект')->wrap(),
