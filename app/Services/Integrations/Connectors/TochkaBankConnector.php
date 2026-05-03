@@ -255,13 +255,76 @@ class TochkaBankConnector implements SourceConnector
 
         if ($preferredAccountId !== '') {
             foreach ($accounts as $account) {
-                if ($this->accountId($account) === $preferredAccountId) {
+                if ($this->accountMatchesPreference($account, $preferredAccountId)) {
                     return $account;
                 }
             }
         }
 
         return $accounts[0] ?? [];
+    }
+
+    protected function accountMatchesPreference(array $account, string $preferredAccount): bool
+    {
+        $preferred = trim($preferredAccount);
+        $preferredDigits = preg_replace('/\D+/', '', $preferred) ?: '';
+
+        foreach ($this->accountSearchValues($account) as $value) {
+            $candidate = trim((string) $value);
+
+            if ($candidate === '') {
+                continue;
+            }
+
+            if ($candidate === $preferred) {
+                return true;
+            }
+
+            $candidateDigits = preg_replace('/\D+/', '', $candidate) ?: '';
+
+            if ($preferredDigits !== '' && $candidateDigits !== '') {
+                if ($candidateDigits === $preferredDigits) {
+                    return true;
+                }
+
+                if (
+                    strlen($preferredDigits) >= 10
+                    && strlen($candidateDigits) >= 10
+                    && (str_contains($preferredDigits, $candidateDigits) || str_contains($candidateDigits, $preferredDigits))
+                ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, scalar|null>
+     */
+    protected function accountSearchValues(array $account): array
+    {
+        $values = [
+            $this->accountId($account),
+            data_get($account, 'account'),
+            data_get($account, 'accountNumber'),
+            data_get($account, 'AccountNumber'),
+            data_get($account, 'account_number'),
+            data_get($account, 'number'),
+            data_get($account, 'bik'),
+            data_get($account, 'bic'),
+            data_get($account, 'bank.bik'),
+            data_get($account, 'bank.bic'),
+        ];
+
+        array_walk_recursive($account, function ($value) use (&$values): void {
+            if (is_scalar($value) || $value === null) {
+                $values[] = $value;
+            }
+        });
+
+        return $values;
     }
 
     protected function syncFinanceRows(BankStatementRow $statementRow, array $normalized, array $transaction): void

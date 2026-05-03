@@ -20,7 +20,9 @@ class SyncTochkaCompaniesToAmo extends Command
         {--from= : Дата начала выгрузки, по умолчанию начало текущего года}
         {--to= : Дата окончания выгрузки, по умолчанию сегодня}
         {--tag=Точка : Тег для компаний в amoCRM}
-        {--from-db : Не ходить в Точку, взять компании и метрики из локальной БД}';
+        {--from-db : Не ходить в Точку, взять компании и метрики из локальной БД}
+        {--poll-attempts= : Сколько раз ждать готовности выписки Точки}
+        {--poll-seconds= : Сколько секунд ждать между проверками выписки Точки}';
 
     protected $description = 'Выгрузить контрагентов из Точки и синхронизировать компании в amoCRM по ИНН с тегом.';
 
@@ -62,6 +64,7 @@ class SyncTochkaCompaniesToAmo extends Command
                     count($clientMetrics),
                 ));
             } else {
+                $this->applyPollingOptions($tochkaConnection);
                 $this->info('Забираю контрагентов из Точки: '.$from->toDateString().' - '.$to->toDateString());
                 $tochkaStats = $tochka->syncCounterparties($tochkaConnection, $from, $to);
                 $clients = $tochkaStats['clients'];
@@ -120,6 +123,30 @@ class SyncTochkaCompaniesToAmo extends Command
             ->where('source_key', $sourceKey)
             ->where('is_enabled', true)
             ->first();
+    }
+
+    private function applyPollingOptions(SourceConnection $connection): void
+    {
+        $settings = is_array($connection->settings ?? null) ? $connection->settings : [];
+        $pollAttempts = $this->integerOption('poll-attempts');
+        $pollSeconds = $this->integerOption('poll-seconds');
+
+        if ($pollAttempts !== null) {
+            $settings['poll_attempts'] = max(1, $pollAttempts);
+        }
+
+        if ($pollSeconds !== null) {
+            $settings['poll_seconds'] = max(0, $pollSeconds);
+        }
+
+        $connection->settings = $settings;
+    }
+
+    private function integerOption(string $option): ?int
+    {
+        $value = trim((string) $this->option($option));
+
+        return $value !== '' ? (int) $value : null;
     }
 
     private function dateOption(string $option): ?CarbonImmutable
