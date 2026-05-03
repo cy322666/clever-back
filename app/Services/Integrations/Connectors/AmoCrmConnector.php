@@ -503,7 +503,17 @@ class AmoCrmConnector
             throw new \RuntimeException('amoCRM is not configured');
         }
 
-        $stats = ['pulled' => 0, 'created' => 0, 'updated' => 0, 'skipped' => 0, 'tagged' => 0, 'metrics_updated' => 0, 'warnings' => []];
+        $stats = [
+            'pulled' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'tagged' => 0,
+            'metrics_updated' => 0,
+            'deals_created' => 0,
+            'deals_updated' => 0,
+            'warnings' => [],
+        ];
 
         foreach ($clients as $client) {
             if (! $client instanceof Client) {
@@ -557,6 +567,8 @@ class AmoCrmConnector
                     $stats['metrics_updated']++;
                 }
 
+                $companyDealResult = $this->upsertAmoCompanyDeal($settings, $client, $companyId, $displayName, $metrics);
+
                 $client->forceFill([
                     'source_type' => 'amo_company',
                     'external_id' => $companyId,
@@ -569,10 +581,18 @@ class AmoCrmConnector
                         'amo_company' => $amoCompany,
                         'amo_company_synced_at' => now()->toDateTimeString(),
                         'amo_company_sync_tag' => $tagName,
+                        'amo_company_pipeline_deal_id' => $companyDealResult['id'],
+                        'amo_company_pipeline_id' => $companyDealResult['pipeline_id'],
+                        'amo_company_pipeline_deals' => array_merge(
+                            (array) data_get(is_array($client->metadata) ? $client->metadata : [], 'amo_company_pipeline_deals', []),
+                            [(string) $companyDealResult['pipeline_id'] => $companyDealResult['id']],
+                        ),
+                        'amo_company_pipeline_deal_synced_at' => now()->toDateTimeString(),
                     ]),
                 ]);
                 $client->save();
 
+                $companyDealResult['created'] ? $stats['deals_created']++ : $stats['deals_updated']++;
                 $createdInAmo ? $stats['created']++ : $stats['updated']++;
             } catch (Throwable $throwable) {
                 report($throwable);
@@ -802,6 +822,141 @@ class AmoCrmConnector
         $response->throw();
 
         return true;
+    }
+
+    /**
+     * @param  array{ltv:float, sales_count:int, average_check:float, segment:string}  $metrics
+     * @return array{id:string, pipeline_id:int, created:bool}
+     */
+    protected function upsertAmoCompanyDeal(array $settings, Client $client, string $companyId, string $companyName, array $metrics): array
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+        $pipelineId = (int) ($settings['company_deal_pipeline_id'] ?? config('services.amo.company_deal_pipeline_id', 10877106));
+
+        if ($baseUrl === '' || $token === '' || $companyId === '' || $pipelineId <= 0) {
+            throw new \RuntimeException('amoCRM company deal sync is not configured');
+        }
+
+        $storedDealId = $this->storedAmoCompanyDealId($client, $pipelineId);
+        $payload = $this->amoCompanyDealPayload($settings, $companyId, $companyName, $pipelineId, $metrics);
+
+        if ($storedDealId !== null && $this->patchAmoLead($settings, $storedDealId, $payload)) {
+            return ['id' => $storedDealId, 'pipeline_id' => $pipelineId, 'created' => false];
+        }
+
+        $foundDealId = $this->findAmoCompanyDealId($settings, $companyId, $pipelineId);
+
+        if ($foundDealId !== null && $this->patchAmoLead($settings, $foundDealId, $payload)) {
+            return ['id' => $foundDealId, 'pipeline_id' => $pipelineId, 'created' => false];
+        }
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->post($baseUrl.'/api/v4/leads', [$payload]);
+
+        $response->throw();
+
+        $createdDealId = (string) data_get($response->json(), '_embedded.leads.0.id', '');
+
+        if ($createdDealId === '') {
+            throw new \RuntimeException('amoCRM did not return created company deal id');
+        }
+
+        return ['id' => $createdDealId, 'pipeline_id' => $pipelineId, 'created' => true];
+    }
+
+    /**
+     * @param  array{ltv:float, sales_count:int, average_check:float, segment:string}  $metrics
+     * @return array<string, mixed>
+     */
+    protected function amoCompanyDealPayload(array $settings, string $companyId, string $companyName, int $pipelineId, array $metrics): array
+    {
+        $prefix = trim((string) ($settings['company_deal_name_prefix'] ?? config('services.amo.company_deal_name_prefix', 'Компания')));
+        $name = trim(($prefix !== '' ? $prefix.' - ' : '').$companyName);
+
+        return [
+            'name' => $name !== '' ? $name : 'Компания '.$companyId,
+            'pipeline_id' => $pipelineId,
+            'price' => (int) round((float) ($metrics['ltv'] ?? 0)),
+            '_embedded' => [
+                'companies' => [
+                    ['id' => (int) $companyId],
+                ],
+            ],
+        ];
+    }
+
+    protected function storedAmoCompanyDealId(Client $client, int $pipelineId): ?string
+    {
+        $metadata = is_array($client->metadata ?? null) ? $client->metadata : [];
+        $pipelineDealId = (string) data_get($metadata, 'amo_company_pipeline_deals.'.$pipelineId, '');
+        $legacyPipelineId = (int) data_get($metadata, 'amo_company_pipeline_id', 0);
+        $legacyDealId = (string) data_get($metadata, 'amo_company_pipeline_deal_id', '');
+
+        if ($pipelineDealId !== '') {
+            return $pipelineDealId;
+        }
+
+        if ($legacyPipelineId === $pipelineId && $legacyDealId !== '') {
+            return $legacyDealId;
+        }
+
+        return null;
+    }
+
+    protected function patchAmoLead(array $settings, string $leadId, array $payload): bool
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+        unset($payload['_embedded']);
+
+        if ($baseUrl === '' || $token === '' || $leadId === '') {
+            return false;
+        }
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->patch($baseUrl.'/api/v4/leads/'.$leadId, $payload);
+
+        if ($response->status() === 404) {
+            return false;
+        }
+
+        $response->throw();
+
+        return true;
+    }
+
+    protected function findAmoCompanyDealId(array $settings, string $companyId, int $pipelineId): ?string
+    {
+        $links = $this->fetchAmoCollection($settings, '/api/v4/companies/'.$companyId.'/links', [], 'links');
+
+        foreach ($links as $link) {
+            if ((string) data_get($link, 'to_entity_type', '') !== 'leads') {
+                continue;
+            }
+
+            $leadId = (string) data_get($link, 'to_entity_id', '');
+
+            if ($leadId === '') {
+                continue;
+            }
+
+            $lead = $this->fetchAmoEntity($settings, '/api/v4/leads/'.$leadId);
+
+            if ((int) data_get($lead, 'pipeline_id') === $pipelineId) {
+                return $leadId;
+            }
+        }
+
+        return null;
     }
 
     /**

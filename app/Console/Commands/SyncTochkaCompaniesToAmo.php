@@ -91,12 +91,14 @@ class SyncTochkaCompaniesToAmo extends Command
             );
 
             $this->line(sprintf(
-                'amoCRM: обработано %d, создано %d, найдено/обновлено %d, тег поставлен %d, поля LTV/продаж обновлены %d, пропущено %d.',
+                'amoCRM: обработано %d, создано %d, найдено/обновлено %d, тег поставлен %d, поля LTV/продаж обновлены %d, сделок создано %d, сделок обновлено %d, пропущено %d.',
                 $amoStats['pulled'],
                 $amoStats['created'],
                 $amoStats['updated'],
                 $amoStats['tagged'],
                 $amoStats['metrics_updated'],
+                $amoStats['deals_created'] ?? 0,
+                $amoStats['deals_updated'] ?? 0,
                 $amoStats['skipped'],
             ));
 
