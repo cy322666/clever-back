@@ -33,7 +33,6 @@ class AmoCrmConnector
     protected ?int $companySalesAmountFieldId = null;
     protected ?int $companyAverageCheckFieldId = null;
     protected ?int $companySalesCountFieldId = null;
-    protected ?int $companySegmentFieldId = null;
     protected array $pipelineCache = [];
     protected array $stageCache = [];
 
@@ -547,6 +546,9 @@ class AmoCrmConnector
                     $stats['tagged']++;
                 }
 
+                $metrics = $this->companyMetrics($client, $clientMetrics[$client->id] ?? null);
+                $this->replaceAmoCompanyTags($settings, $companyId, ['A', 'B', 'C'], [$metrics['segment']]);
+
                 $displayName = $this->shortCompanyName((string) ($client->legal_name ?: $client->name));
 
                 $this->updateAmoCompanyName($settings, $companyId, $displayName);
@@ -813,7 +815,6 @@ class AmoCrmConnector
         $salesAmountFieldId = $this->companySalesAmountFieldId($settings);
         $averageCheckFieldId = $this->companyAverageCheckFieldId($settings);
         $salesCountFieldId = $this->companySalesCountFieldId($settings);
-        $segmentFieldId = $this->companySegmentFieldId($settings);
         $usedFieldIds = [];
 
         if ($ltvFieldId !== null) {
@@ -854,15 +855,6 @@ class AmoCrmConnector
                 ],
             ];
             $usedFieldIds[] = $averageCheckFieldId;
-        }
-
-        if ($segmentFieldId !== null && ! in_array($segmentFieldId, $usedFieldIds, true)) {
-            $fields[] = [
-                'field_id' => $segmentFieldId,
-                'values' => [
-                    ['value' => (string) $metrics['segment']],
-                ],
-            ];
         }
 
         return $fields;
@@ -946,6 +938,67 @@ class AmoCrmConnector
         }
 
         $tags->push(['name' => $tagName]);
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->connectTimeout(5)
+            ->timeout(25)
+            ->patch($baseUrl.'/api/v4/companies/'.$companyId, [
+                '_embedded' => [
+                    'tags' => $tags->values()->all(),
+                ],
+            ]);
+
+        $response->throw();
+
+        return true;
+    }
+
+    /**
+     * @param  array<int, string>  $removeTagNames
+     * @param  array<int, string>  $addTagNames
+     */
+    protected function replaceAmoCompanyTags(array $settings, string $companyId, array $removeTagNames, array $addTagNames): bool
+    {
+        $baseUrl = rtrim((string) ($settings['base_url'] ?? config('services.amo.base_url')), '/');
+        $token = trim((string) ($settings['access_token'] ?? config('services.amo.access_token')));
+
+        if ($baseUrl === '' || $token === '' || $companyId === '') {
+            return false;
+        }
+
+        $remove = collect($removeTagNames)
+            ->map(fn (string $tag): string => Str::lower(trim($tag)))
+            ->filter()
+            ->all();
+        $add = collect($addTagNames)
+            ->map(fn (string $tag): string => trim($tag))
+            ->filter()
+            ->unique(fn (string $tag): string => Str::lower($tag))
+            ->values();
+
+        $company = $this->fetchAmoEntity($settings, '/api/v4/companies/'.$companyId, ['with' => 'tags']);
+        $tags = collect(data_get($company, '_embedded.tags', []))
+            ->filter(fn ($tag): bool => is_array($tag))
+            ->map(function (array $tag): array {
+                $id = (int) data_get($tag, 'id', 0);
+                $name = trim((string) data_get($tag, 'name', ''));
+
+                return array_filter([
+                    'id' => $id > 0 ? $id : null,
+                    'name' => $name !== '' ? $name : null,
+                ], fn ($value): bool => filled($value));
+            })
+            ->filter(fn (array $tag): bool => filled($tag['id'] ?? null) || filled($tag['name'] ?? null))
+            ->reject(fn (array $tag): bool => in_array(Str::lower((string) ($tag['name'] ?? '')), $remove, true))
+            ->values();
+
+        foreach ($add as $tagName) {
+            if (! $tags->contains(fn (array $tag): bool => Str::lower((string) ($tag['name'] ?? '')) === Str::lower($tagName))) {
+                $tags->push(['name' => $tagName]);
+            }
+        }
 
         $response = Http::withToken($token)
             ->acceptJson()
@@ -1078,27 +1131,6 @@ class AmoCrmConnector
             'Средняя сумма продажи',
             'Средняя сумма оплаты',
         ], ['average_check', 'avg_check', 'average_sale', 'avg_sale']);
-    }
-
-    protected function companySegmentFieldId(array $settings): ?int
-    {
-        if ($this->companySegmentFieldId !== null) {
-            return $this->companySegmentFieldId;
-        }
-
-        $configured = (int) ($settings['company_segment_field_id'] ?? config('services.amo.company_segment_field_id'));
-
-        if ($configured > 0) {
-            return $this->companySegmentFieldId = $configured;
-        }
-
-        return $this->companySegmentFieldId = $this->findAmoCompanyCustomFieldId($settings, [
-            (string) ($settings['company_segment_field_name'] ?? config('services.amo.company_segment_field_name', 'Сегмент')),
-            'Сегмент',
-            'ABC',
-            'ABC сегмент',
-            'Сегмент клиента',
-        ], ['segment', 'abc_segment', 'client_segment']);
     }
 
     /**
