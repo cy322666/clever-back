@@ -93,7 +93,10 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
 
     protected function getTableColumns(): array
     {
-        return $this->applyColumnOrder('production_projects', $this->baseTableColumns());
+        return [
+            $this->hideProjectColumn(),
+            ...$this->applyColumnOrder('production_projects', $this->baseTableColumns()),
+        ];
     }
 
     protected function baseTableColumns(): array
@@ -180,6 +183,16 @@ class ProductionProjectsTableWidget extends ArrayRecordsTableWidget
             TextColumn::make('owner_profit')->label('Маржа после ФОТ')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
             TextColumn::make('salary_cost')->label('Фонд оплаты труда')->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')->sortable(),
         ];
+    }
+
+    protected function hideProjectColumn(): TextColumn
+    {
+        return TextColumn::make('__hide_project')
+            ->label('')
+            ->default('Скрыть')
+            ->badge()
+            ->color('gray')
+            ->action(fn (): null => null);
     }
 
     protected function updateProject(int $projectId, array $attributes): void
