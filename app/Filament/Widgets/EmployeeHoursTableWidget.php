@@ -81,7 +81,6 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                 ->badge()
                 ->color(fn ($state): string => (int) $state > 2 ? 'danger' : ((int) $state > 0 ? 'warning' : 'success'))
                 ->sortable(),
-            TextColumn::make('overdue_tasks')->label('Просроченные задачи')->numeric()->sortable(),
             TextColumn::make('owner_margin')
                 ->label('Маржа после ФОТ')
                 ->formatStateUsing(fn ($state) => number_format((float) $state, 0, ',', ' ') . ' ₽')
@@ -99,11 +98,6 @@ class EmployeeHoursTableWidget extends ArrayRecordsTableWidget
                     'Норма' => 'success',
                     default => 'gray',
                 })
-                ->sortable(),
-            TextColumn::make('role')
-                ->label('Роль')
-                ->badge()
-                ->color(fn (array $record): string => ($record['is_owner'] ?? false) ? 'warning' : 'gray')
                 ->sortable(),
         ];
     }
