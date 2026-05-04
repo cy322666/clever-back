@@ -35,10 +35,9 @@ class ManualAdjustments extends AnalyticsPage
      */
     protected function getHeaderActions(): array
     {
-        $actions = parent::getHeaderActions();
         app(CompanyResolver::class)->resolve();
 
-        return array_merge($actions, [
+        return [
             Action::make('projectStatus')
                 ->label('Статус проекта')
                 ->icon(Heroicon::OutlinedArrowsRightLeft)
@@ -245,6 +244,6 @@ class ManualAdjustments extends AnalyticsPage
                         'note' => $data['note'] ?? null,
                     ]);
                 }),
-        ]);
+        ];
     }
 }
