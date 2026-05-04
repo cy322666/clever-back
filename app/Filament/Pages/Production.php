@@ -6,6 +6,7 @@ use App\Filament\Widgets\EmployeeProductionChartWidget;
 use App\Filament\Widgets\EmployeeProductionStatsWidget;
 use App\Filament\Widgets\EmployeeHoursTableWidget;
 use App\Filament\Widgets\EmployeeHoursChartWidget;
+use App\Filament\Widgets\ProjectResponsibleChartWidget;
 use App\Filament\Widgets\ProjectTypeHoursChartWidget;
 use App\Filament\Widgets\ProductionProjectsTableWidget;
 use App\Filament\Widgets\ProductionStatsOverviewWidget;
@@ -29,6 +30,7 @@ class Production extends AnalyticsPage
             $this->widget(EmployeeProductionChartWidget::class, ['employee' => $employee], true),
             $this->widget(EmployeeHoursChartWidget::class, withPeriod: true),
             $this->widget(ProjectTypeHoursChartWidget::class, withPeriod: true),
+            $this->widget(ProjectResponsibleChartWidget::class, withPeriod: true),
             $this->widget(EmployeeHoursTableWidget::class, withPeriod: true),
             $this->widget(ProductionProjectsTableWidget::class, withPeriod: true),
         ];
