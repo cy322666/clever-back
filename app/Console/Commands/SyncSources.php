@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\SourceConnection;
 use App\Services\Integrations\SourceConnectionBootstrapper;
 use App\Services\Integrations\SourceSyncService;
+use App\Services\Invoices\TochkaInvoicePaymentMatcher;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -14,7 +15,7 @@ class SyncSources extends Command
 
     protected $description = 'Run source synchronization for amoCRM, Weeek and bank sources.';
 
-    public function handle(SourceSyncService $service, SourceConnectionBootstrapper $bootstrapper): int
+    public function handle(SourceSyncService $service, SourceConnectionBootstrapper $bootstrapper, TochkaInvoicePaymentMatcher $invoicePaymentMatcher): int
     {
         try {
             $this->info('Looking for enabled source connections...');
@@ -63,6 +64,7 @@ class SyncSources extends Command
 
                 $successCount = collect($results)->filter(fn ($result) => $result['log']->error_count === 0)->count();
                 $this->info("Synced {$successCount} sources successfully.");
+                $this->matchInvoicePayments($invoicePaymentMatcher);
 
                 return self::SUCCESS;
             }
@@ -98,11 +100,35 @@ class SyncSources extends Command
 
             $log->error_count > 0 ? $this->warn($line) : $this->line($line);
 
+            if (in_array($sourceKey, ['tochka', 'amo'], true)) {
+                $this->matchInvoicePayments($invoicePaymentMatcher);
+            }
+
             return self::SUCCESS;
         } catch (Throwable $throwable) {
             $this->warn($throwable->getMessage());
 
             return self::SUCCESS;
+        }
+    }
+
+    protected function matchInvoicePayments(TochkaInvoicePaymentMatcher $invoicePaymentMatcher): void
+    {
+        try {
+            $stats = $invoicePaymentMatcher->match(
+                paidStatus: (string) config('services.amo.invoice_paid_status', 'Оплачен'),
+            );
+
+            $this->line(sprintf(
+                '[invoices] Точка -> amoCRM matched: paid %d, skipped %d, ambiguous %d, failed %d',
+                $stats['applied'],
+                $stats['skipped'],
+                $stats['ambiguous'],
+                $stats['failed'],
+            ));
+        } catch (Throwable $throwable) {
+            report($throwable);
+            $this->warn('[invoices] Payment matching failed: '.$throwable->getMessage());
         }
     }
 

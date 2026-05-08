@@ -4,6 +4,9 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('analytics:refresh-snapshots')->hourly();
 Schedule::command('sources:sync --all')->hourly();
+Schedule::command('invoices:match-tochka-payments', [
+    '--paid-status' => env('AMO_INVOICE_PAID_STATUS', 'Оплачен'),
+])->hourlyAt(15)->withoutOverlapping(60);
 Schedule::command('tochka:sync-companies-to-amo', [
     '--from' => env('TOCHKA_COMPANIES_AMO_SYNC_FROM', '2022-01-01'),
     '--poll-attempts' => env('TOCHKA_COMPANIES_AMO_SYNC_POLL_ATTEMPTS', 240),

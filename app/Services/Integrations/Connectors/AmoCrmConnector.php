@@ -1531,7 +1531,7 @@ class AmoCrmConnector
         $invoicePaymentHashFieldId = (int) data_get($settings, 'invoice_payment_hash_field_id', config('services.amo.invoice_payment_hash_field_id', 458745));
         $invoiceItemsFieldId = (int) data_get($settings, 'invoice_items_field_id', config('services.amo.invoice_items_field_id', 169939));
 
-        $customers = $amoApi->customers()->get(['links']);
+        $customers = $amoApi->customers()->get(['links', 'companies']);
         $seenInvoices = [];
         $pulled = 0;
         $created = 0;

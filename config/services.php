@@ -15,6 +15,8 @@ return [
         'invoice_vat_field_id' => env('AMO_INVOICE_VAT_FIELD_ID', 169889),
         'invoice_payment_hash_field_id' => env('AMO_INVOICE_PAYMENT_HASH_FIELD_ID', 458745),
         'invoice_items_field_id' => env('AMO_INVOICE_ITEMS_FIELD_ID', 169939),
+        'invoice_paid_status' => env('AMO_INVOICE_PAID_STATUS', 'Оплачен'),
+        'invoice_payment_match_tolerance' => env('AMO_INVOICE_PAYMENT_MATCH_TOLERANCE', 1),
         'company_inn_field_id' => env('AMO_COMPANY_INN_FIELD_ID'),
         'company_inn_field_name' => env('AMO_COMPANY_INN_FIELD_NAME', 'ИНН'),
         'company_ltv_field_id' => env('AMO_COMPANY_LTV_FIELD_ID'),
